@@ -280,7 +280,7 @@ tqdm==4.68.3
     #   huggingface-hub
     #   lm-eval
     #   nltk
-typepy==1.3.5
+typepy==2.0.0
     # via
     #   dataproperty
     #   pytablewriter
