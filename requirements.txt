@@ -285,7 +285,7 @@ typepy==1.3.5
     #   dataproperty
     #   pytablewriter
     #   tabledata
-typer==0.25.1
+typer==0.26.8
     # via huggingface-hub
 typing-extensions==4.15.0
     # via
