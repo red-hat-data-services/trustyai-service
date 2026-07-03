@@ -27,7 +27,7 @@ jobs:
           count: 1
           labels: "ok-to-test, lgtm, approved"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Add expiry label to CI image
         run: |
