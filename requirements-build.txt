@@ -12,7 +12,7 @@ pathspec==1.1.1
     # via hatchling
 pluggy==1.6.0
     # via hatchling
-setuptools==82.0.1
+setuptools==83.0.0
     # via setuptools-scm
 setuptools-scm==10.2.0
     # via hatch-vcs
