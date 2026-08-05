@@ -18,5 +18,5 @@ setuptools-scm==10.2.0
     # via hatch-vcs
 trove-classifiers==2026.6.1.19
     # via hatchling
-vcs-versioning==2.2.2
+vcs-versioning==2.2.3
     # via setuptools-scm
