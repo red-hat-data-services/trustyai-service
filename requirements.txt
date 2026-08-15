@@ -151,8 +151,9 @@ h11==0.16.0 \
     #   uvicorn
     #   wsproto
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9-test/simple/
-h2==4.3.0 \
-    --hash=sha256:7d7347dadeb150dbe161212b52d123213876100aff9e3a45f1cf9c6b3e1cff1d
+h2==4.4.1 \
+    --hash=sha256:0e25f1462b23c9cb82d9eb02e28bc706dac2a68cb457c6a0d74d63c8a2a5d0e6 \
+    --hash=sha256:4e866ffb1a869ae14dd9b5e6beb5c24a13da0495ad72b65925ded182521c1516
     # via hypercorn
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9-test/simple/
 h5py==3.16.0 \
