@@ -287,8 +287,9 @@ narwhals==2.23.0 \
     --hash=sha256:c1627216d19dd2e8ba31484f558b450424cb253bcb73950922a0cf133b57ea77
     # via scikit-learn
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9-test/simple/
-nltk==3.10.0 \
-    --hash=sha256:a15da2911adca5c7b4574b902f6b344f3f65db72ded7f79b30617bbe7100d318
+nltk==3.10.3 \
+    --hash=sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4 \
+    --hash=sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c
     # via
     #   trustyai-service (pyproject.toml)
     #   rouge-score
