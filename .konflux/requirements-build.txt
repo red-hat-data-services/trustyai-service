@@ -9,9 +9,15 @@ cython==3.2.9 \
     --hash=sha256:8a5d1a7a38bb4b33be52807f5720461d4a130e836bbb7e45a5b518cb6f2e9255
     # via -r /Users/sudsinha/Repositories/work/trustyai-service/.konflux/requirements-build.in
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
+hatch-vcs==0.5.0 \
+    --hash=sha256:8c39c80bf20b575230b8f95641a97ff48f343bf656b6b44fc02f2566d49c3d7d
+    # via -r /Users/sudsinha/Repositories/work/trustyai-service/.konflux/requirements-build.in
+    # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 hatchling==1.32.0 \
     --hash=sha256:5bff40a7b931c0032c37d5fc74c87df1b81bec4a1c3665296b5448bfa7b137bb
-    # via -r /Users/sudsinha/Repositories/work/trustyai-service/.konflux/requirements-build.in
+    # via
+    #   -r /Users/sudsinha/Repositories/work/trustyai-service/.konflux/requirements-build.in
+    #   hatch-vcs
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 numpy==2.5.2 \
     --hash=sha256:0044665c94ad26cb4ba49db1b50e3634de4f7773859c90c612da981ab08fbd2f \
@@ -22,7 +28,10 @@ numpy==2.5.2 \
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 packaging==26.3 \
     --hash=sha256:deb834ee2fe51e528b40cca13dd998c438ba0f0ba890d86c7ef1918afe4a9dbb
-    # via hatchling
+    # via
+    #   hatchling
+    #   setuptools-scm
+    #   vcs-versioning
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 pathspec==1.1.1 \
     --hash=sha256:45973abce61c60e2a4026e583c97f44d7c9453efb6ea7ec6bfbb82ff2294bc55
@@ -32,6 +41,14 @@ pluggy==1.6.0 \
     --hash=sha256:eb916f2cdafd558b27aa4c2a9d813134691c9fdd394270817c598a508cf89855
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
+setuptools==84.0.0 \
+    --hash=sha256:d3a096864c3017b2b537f98876fb7c795958f7bb4e2fb1204ec98cf1850c0db2
+    # via setuptools-scm
+    # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
+setuptools-scm==10.2.1 \
+    --hash=sha256:9d0b107e9c1f05a0dea8a70c9e51d02331dc1e2a024773ef1a284e6b560a6afa
+    # via hatch-vcs
+    # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 tomlkit==0.15.1 \
     --hash=sha256:eabc999a00d57b316452c1c81095e8e0aa93b7feae2e22c7ac36ecf9bdb709bf
     # via hatchling
@@ -39,4 +56,8 @@ tomlkit==0.15.1 \
 trove-classifiers==2026.6.1.19 \
     --hash=sha256:af674cc313d3fb0d5a377850befd49ccbf57124d173a39895ba6f3bf2835594b
     # via hatchling
+    # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
+vcs-versioning==2.2.4 \
+    --hash=sha256:8a116011301496239243fe324dd8cbaa4b303c57bb18ee7470d833ed784dc45c
+    # via setuptools-scm
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
