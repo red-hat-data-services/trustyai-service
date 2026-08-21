@@ -1,0 +1,45 @@
+ARG CPU_BASE_IMAGE
+
+FROM ${CPU_BASE_IMAGE} AS builder
+
+USER root
+
+COPY pyproject.toml README.md ./
+
+ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0.dev0"
+
+RUN mkdir -p src && \
+    pip install --no-cache-dir ".[mariadb,mmd]"
+
+FROM ${CPU_BASE_IMAGE}
+
+USER root
+
+COPY --from=builder /opt/app-root/lib/python3.12/site-packages /opt/app-root/lib/python3.12/site-packages
+COPY --from=builder /opt/app-root/bin /opt/app-root/bin
+
+WORKDIR /opt/app-root
+
+COPY src src
+COPY pyproject.toml README.md ./
+
+ARG VERSION="0.0.0.dev0"
+RUN printf '__version__ = version = "%s"\n' "${VERSION}" > src/_version.py && \
+    chown 1001:0 src/_version.py
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONHASHSEED=random
+
+USER 1001
+EXPOSE 8080 4443
+
+CMD ["python", "-m", "src.main"]
+
+LABEL name="rhoai/odh-trustyai-service-py-rhel9" \
+      com.redhat.component="odh-trustyai-service-py-rhel9" \
+      io.k8s.display-name="odh-trustyai-service-py-rhel9" \
+      io.k8s.description="Python implementation of TrustyAI Service for AI explainability and fairness" \
+      description="Python implementation of TrustyAI Service for AI explainability and fairness" \
+      summary="TrustyAI Service for AI explainability, fairness, and model evaluation" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
