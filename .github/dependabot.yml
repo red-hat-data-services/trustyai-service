@@ -8,3 +8,25 @@ updates:
       - trustyai-explainability/reviewers
     reviewers:
       - trustyai-explainability/reviewers
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - trustyai-explainability/reviewers
+    reviewers:
+      - trustyai-explainability/reviewers
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action/*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - trustyai-explainability/reviewers
+    reviewers:
+      - trustyai-explainability/reviewers

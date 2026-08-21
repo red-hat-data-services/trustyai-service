@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
-from httpx import Response
+from httpx2 import Response
 
-import src.main
-from src.service.constants import (
+import trustyai_service.main
+from trustyai_service.endpoints import routes
+from trustyai_service.service.constants import (
     TRUSTYAI_TAG_PREFIX,
 )
-from src.service.data.model_data import ModelData
+from trustyai_service.service.data.model_data import ModelData
 
 # Test constants
 MIN_INPUT_COLUMNS = 2  # Minimum expected input columns in test data
@@ -250,15 +251,15 @@ class TestUploadEndpointPVC(unittest.TestCase):
         self.addCleanup(restore_environment)
 
         # Force reload of the global storage interface to use the new temp dir
-        from src.service.data import (  # noqa: PLC0415  # re-import after reload for test isolation
+        from trustyai_service.service.data import (  # noqa: PLC0415  # re-import after reload for test isolation
             storage,
         )
 
         storage.get_global_storage_interface(force_reload=True)
 
         # Re-create the FastAPI app to ensure it uses the new storage interface
-        reload(src.main)
-        from src.main import (  # noqa: PLC0415  # re-import after reload for test isolation
+        reload(trustyai_service.main)
+        from trustyai_service.main import (  # noqa: PLC0415  # re-import after reload for test isolation
             app,
         )
 
@@ -276,7 +277,7 @@ class TestUploadEndpointPVC(unittest.TestCase):
         _check_msgs: list[str],
     ) -> Response:
         """Post a payload and check the response."""
-        response = self.client.post("/data/upload", json=payload)
+        response = self.client.post(routes.DATA_UPLOAD, json=payload)
         assert response.status_code == expected_status_code
         return response
 
@@ -399,7 +400,7 @@ class TestUploadEndpointPVC(unittest.TestCase):
             "FP64",
             "TRAINING",
         )
-        response = self.client.post("/data/upload", json=payload)
+        response = self.client.post(routes.DATA_UPLOAD, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "input shapes were mismatched" in response.text
         assert "[250, 4]" in response.text
@@ -435,7 +436,7 @@ class TestUploadEndpointPVC(unittest.TestCase):
             },
         }
 
-        response = self.client.post("/data/upload", json=payload)
+        response = self.client.post(routes.DATA_UPLOAD, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         response_text = response.text
         assert "Could not reconcile" in response_text

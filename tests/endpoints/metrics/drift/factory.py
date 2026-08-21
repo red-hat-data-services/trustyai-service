@@ -33,9 +33,11 @@ import polars as pl
 from fastapi.testclient import TestClient
 from prometheus_client import CollectorRegistry
 
-from src.service.payloads.metrics.base_metric_request import BaseMetricRequest
-from src.service.prometheus.gauge_config import GaugeConfig
-from src.service.prometheus.prometheus_publisher import PrometheusPublisher
+from trustyai_service.service.payloads.metrics.base_metric_request import (
+    BaseMetricRequest,
+)
+from trustyai_service.service.prometheus.gauge_config import GaugeConfig
+from trustyai_service.service.prometheus.prometheus_publisher import PrometheusPublisher
 
 # TypeVar for metric request classes
 TMetricRequest = TypeVar("TMetricRequest", bound=BaseMetricRequest)
@@ -59,9 +61,9 @@ def make_compute_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param module_path: Module path for patching (e.g.,
-        "src.endpoints.metrics.drift.kolmogorov_smirnov")
+        "trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov")
     :param endpoint_path: API endpoint path (e.g.,
-        "/metrics/drift/kstest")
+        routes.DRIFT_KSTEST.compute)
     :param client: TestClient instance for making requests
     :param request_payload: Request payload dictionary
     :param expected_response_keys: Keys expected in successful response
@@ -69,21 +71,24 @@ def make_compute_endpoint_test(
     :return: Test function
     """
 
+    @patch("trustyai_service.endpoints.metrics.drift.validation.get_shared_data_source")
     @patch(f"{module_path}.get_data_source")
-    def test_impl(_: object, mock_ds: MagicMock) -> None:
+    def test_impl(_: object, mock_ds: MagicMock, mock_shared_ds: MagicMock) -> None:
         """Test compute endpoint returns valid response structure."""
         # Create sample dataframe (Pandas or Polars based on df_type)
-        sample_df = _create_sample_dataframe(
-            request_payload.get("fitColumns", ["feature1"]),
-            df_type=df_type,
-        )
+        columns = request_payload.get("fitColumns", ["feature1"])
+        sample_df = _create_sample_dataframe(columns, df_type=df_type)
 
         # Mock data source
         mock_data_source = MagicMock()
         mock_data_source.get_dataframe_by_tag = AsyncMock(return_value=sample_df)
         mock_data_source.get_organic_dataframe = AsyncMock(return_value=sample_df)
         mock_data_source.get_dataframe = AsyncMock(return_value=sample_df)
+        mock_metadata = MagicMock()
+        mock_metadata.input_schema.items.keys.return_value = columns
+        mock_data_source.get_metadata = AsyncMock(return_value=mock_metadata)
         mock_ds.return_value = mock_data_source
+        mock_shared_ds.return_value = mock_data_source
 
         # Send request
         response = client.post(endpoint_path, json=request_payload)
@@ -119,7 +124,7 @@ def make_definition_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param endpoint_path: API endpoint path (e.g.,
-        "/metrics/drift/kstest/definition")
+        routes.DRIFT_KSTEST.definition)
     :param client: TestClient instance for making requests
     :param expected_name: Expected metric name in response
     :return: Test function
@@ -165,17 +170,23 @@ def make_schedule_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param module_path: Module path for patching (e.g.,
-        "src.endpoints.metrics.drift.kolmogorov_smirnov")
+        "trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov")
     :param endpoint_path: API endpoint path (e.g.,
-        "/metrics/drift/kstest/request")
+        routes.DRIFT_KSTEST.request)
     :param client: TestClient instance for making requests
     :param request_payload: Request payload dictionary
     :return: Test function
     """
 
+    @patch("trustyai_service.endpoints.metrics.drift.validation.get_shared_data_source")
     @patch(f"{module_path}.get_prometheus_scheduler")
     @patch(f"{module_path}.get_data_source")
-    def test_impl(_: object, mock_ds: MagicMock, mock_sched_fn: MagicMock) -> None:
+    def test_impl(
+        _: object,
+        mock_ds: MagicMock,
+        mock_sched_fn: MagicMock,
+        mock_shared_ds: MagicMock,
+    ) -> None:
         """Test schedule endpoint returns requestId."""
         # Mock scheduler
         mock_sched = MagicMock()
@@ -184,8 +195,11 @@ def make_schedule_endpoint_test(
 
         # Mock data source (needed for KS test registration)
         mock_data_source = MagicMock()
-        mock_data_source.get_metadata = AsyncMock(return_value={"feature1": "type1"})
+        mock_sched_metadata = MagicMock()
+        mock_sched_metadata.input_schema.items.keys.return_value = ["feature1"]
+        mock_data_source.get_metadata = AsyncMock(return_value=mock_sched_metadata)
         mock_ds.return_value = mock_data_source
+        mock_shared_ds.return_value = mock_data_source
 
         # Send request
         response = client.post(endpoint_path, json=request_payload)
@@ -222,9 +236,9 @@ def make_delete_schedule_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param module_path: Module path for patching (e.g.,
-        "src.endpoints.metrics.drift.kolmogorov_smirnov")
+        "trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov")
     :param endpoint_path: API endpoint path (e.g.,
-        "/metrics/drift/kstest/request")
+        routes.DRIFT_KSTEST.request)
     :param client: TestClient instance for making requests
     :return: Test function
     """
@@ -269,9 +283,9 @@ def make_list_requests_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param module_path: Module path for patching (e.g.,
-        "src.endpoints.metrics.drift.kolmogorov_smirnov")
+        "trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov")
     :param endpoint_path: API endpoint path (e.g.,
-        "/metrics/drift/kstest/requests")
+        routes.DRIFT_KSTEST.requests)
     :param client: TestClient instance for making requests
     :return: Test function
     """
@@ -338,17 +352,17 @@ def make_compute_endpoint_error_test(
     def test_impl(_: object, mock_ds: MagicMock) -> None:
         """Test compute endpoint error handling."""
         if setup_mocks:
-            # Create sample dataframe
-            sample_df = _create_sample_dataframe(
-                ["feature1", "feature2"],
-                df_type=df_type,
-            )
+            columns = ["feature1", "feature2"]
+            sample_df = _create_sample_dataframe(columns, df_type=df_type)
 
             # Mock data source
             mock_data_source = MagicMock()
             mock_data_source.get_dataframe_by_tag = AsyncMock(return_value=sample_df)
             mock_data_source.get_organic_dataframe = AsyncMock(return_value=sample_df)
             mock_data_source.get_dataframe = AsyncMock(return_value=sample_df)
+            mock_metadata = MagicMock()
+            mock_metadata.input_schema.items.keys.return_value = columns
+            mock_data_source.get_metadata = AsyncMock(return_value=mock_metadata)
             mock_ds.return_value = mock_data_source
 
         # Send request
@@ -430,7 +444,9 @@ def make_schedule_endpoint_error_test(
 
         # Mock data source
         mock_data_source = MagicMock()
-        mock_data_source.get_metadata = AsyncMock(return_value={"feature1": "type1"})
+        mock_sched_metadata = MagicMock()
+        mock_sched_metadata.input_schema.items.keys.return_value = ["feature1"]
+        mock_data_source.get_metadata = AsyncMock(return_value=mock_sched_metadata)
         mock_ds.return_value = mock_data_source
 
         # Send request
@@ -604,7 +620,9 @@ def make_list_requests_with_data_test(
 
         # Verify request structure
         for req in data["requests"]:
-            assert "requestId" in req, "Missing 'requestId' in request"
+            assert "id" in req or "requestId" in req, "Missing 'id' or 'requestId'"
+            if "id" in req and "requestId" in req:
+                assert req["id"] == req["requestId"], "id and requestId must match"
             assert "modelId" in req, "Missing 'modelId' in request"
             assert "metricName" in req, "Missing 'metricName' in request"
             assert "batchSize" in req, "Missing 'batchSize' in request"
@@ -717,7 +735,9 @@ def make_list_requests_with_malformed_data_test(
 
         # Verify all returned requests have the required structure
         for req in data["requests"]:
-            assert "requestId" in req, "Missing 'requestId' in request"
+            assert "id" in req or "requestId" in req, "Missing 'id' or 'requestId'"
+            if "id" in req and "requestId" in req:
+                assert req["id"] == req["requestId"], "id and requestId must match"
             assert "modelId" in req, "Missing 'modelId' in request"
             assert "metricName" in req, "Missing 'metricName' in request"
             assert "batchSize" in req, "Missing 'batchSize' in request"
@@ -1304,12 +1324,12 @@ def make_deprecated_endpoint_test(
 
     :param metric_name: Name of the metric for logging
     :param deprecated_endpoint_path: Deprecated API endpoint path (e.g.,
-        "/metrics/drift/meanshift")
+        routes.DRIFT_MEANSHIFT.compute)
     :param client: TestClient instance for making requests
     :param endpoint_type: Type of endpoint ("compute", "definition",
         "schedule", "delete", "list")
     :param module_path: Module path for patching (e.g.,
-        "src.endpoints.metrics.drift.compare_means")
+        "trustyai_service.endpoints.metrics.drift.compare_means")
         Required for compute, schedule, delete, and list endpoints
     :param request_payload: Request payload dictionary (required for
         compute/schedule)
@@ -1323,8 +1343,8 @@ def make_deprecated_endpoint_test(
         # Test deprecated compute endpoint
         test_func = make_deprecated_endpoint_test(
             metric_name="Meanshift",
-            module_path="src.endpoints.metrics.drift.compare_means",
-            deprecated_endpoint_path="/metrics/drift/meanshift",
+            module_path="trustyai_service.endpoints.metrics.drift.compare_means",
+            deprecated_endpoint_path=routes.DRIFT_MEANSHIFT.compute,
             client=client,
             endpoint_type="compute",
             request_payload={"modelId": "test", "fitColumns": ["f1"]},
@@ -1334,8 +1354,8 @@ def make_deprecated_endpoint_test(
         # Test deprecated definition endpoint
         test_func = make_deprecated_endpoint_test(
             metric_name="Meanshift",
-            module_path="src.endpoints.metrics.drift.compare_means",
-            deprecated_endpoint_path="/metrics/drift/meanshift/definition",
+            module_path="trustyai_service.endpoints.metrics.drift.compare_means",
+            deprecated_endpoint_path=routes.DRIFT_MEANSHIFT.definition,
             client=client,
             endpoint_type="definition",
             expected_name_substring="T-Test"
@@ -1344,8 +1364,8 @@ def make_deprecated_endpoint_test(
         # Test deprecated list endpoint
         test_func = make_deprecated_endpoint_test(
             metric_name="Meanshift",
-            module_path="src.endpoints.metrics.drift.compare_means",
-            deprecated_endpoint_path="/metrics/drift/meanshift/requests",
+            module_path="trustyai_service.endpoints.metrics.drift.compare_means",
+            deprecated_endpoint_path=routes.DRIFT_MEANSHIFT.requests,
             client=client,
             endpoint_type="list"
         )

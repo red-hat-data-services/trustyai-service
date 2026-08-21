@@ -4,20 +4,19 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/red-hat-data-services/trustyai-service/?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-comment: "^/build-konflux"
     pipelinesascode.tekton.dev/on-label: "[kfbuild-all, kfbuild-trustyai-service-py]"
     pipelinesascode.tekton.dev/on-target-branch: "[{{target_branch}}]"
     pipelinesascode.tekton.dev/on-event: "[pull_request]"
-  creationTimestamp: null
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
   labels:
     appstudio.openshift.io/application: automation
     appstudio.openshift.io/component: pull-request-pipelines-odh-trustyai-service-py
     pipelines.appstudio.openshift.io/type: build
-  name: odh-trustyai-service-py-on-pull-request-{{pull_request_number}}
+  name: odh-trustyai-service-py-on-pull-request
   namespace: rhoai-tenant
 spec:
   params:
@@ -25,8 +24,6 @@ spec:
     value: '{{source_url}}'
   - name: revision
     value: '{{revision}}'
-  - name: output-image
-    value: quay.io/rhoai/pull-request-pipelines:odh-trustyai-service-py-{{revision}}
   - name: additional-tags
     value:
     - 'pr-{{pull_request_number}}-into-{{target_branch}}'
@@ -34,33 +31,29 @@ spec:
     value:
     - version=on-pr-{{revision}}
     - io.openshift.tags=odh-trustyai-service-py
-  - name: image-expires-after
-    value: 5d
+  - name: output-image
+    value: quay.io/rhoai/pull-request-pipelines:odh-trustyai-service-py-{{revision}}
   - name: dockerfile
     value: Dockerfile.konflux
+  - name: path-context
+    value: .
+  - name: hermetic
+    value: "true"
   - name: build-args-file
     value: .konflux/base-images.conf
+  - name: prefetch-input
+    value: '[{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"], "requirements_build_files": ["requirements-build.txt"], "binary": {"arch": "x86_64,aarch64,ppc64le,s390x"}}]'
+  - name: build-image-index
+    value: true
   - name: build-platforms
     value:
     - linux/x86_64
     - linux-m2xlarge/arm64
     - linux/ppc64le
     - linux/s390x
-  - name: prefetch-input
-    value: '[{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"], "requirements_build_files": ["requirements-build.txt"], "binary": {"arch": "x86_64,aarch64,ppc64le,s390x"}}]'
-  - name: hermetic
-    value: "true"
-  - name: build-image-index
-    value: true
-  - name: enable-slack-failure-notification
-    value: "false"
-  - name: path-context
-    value: .
-  timeouts:
-    pipeline: 4h
-    tasks: 2h
+  - name: image-expires-after
+    value: 5d
   pipelineRef:
-    resolver: git
     params:
     - name: url
       value: https://github.com/red-hat-data-services/konflux-central.git
@@ -68,8 +61,11 @@ spec:
       value: '{{ target_branch }}'
     - name: pathInRepo
       value: pipelines/multi-arch-container-build.yaml
+    resolver: git
   taskRunTemplate:
     serviceAccountName: build-pipeline-pull-request-pipelines
+  timeouts:
+    pipeline: 2h
   workspaces:
   - name: git-auth
     secret:

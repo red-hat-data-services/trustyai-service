@@ -9,12 +9,27 @@ from http import HTTPStatus
 from typing import Any
 from unittest import mock
 
+import numpy as np
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.endpoints.consumer.consumer_endpoint import router as consumer_router
-from src.service.data.modelmesh_parser import ModelMeshPayloadParser, PartialPayload
 from tests.service.data.test_utils import ModelMeshTestData
+from trustyai_service.endpoints import routes
+from trustyai_service.endpoints.consumer.consumer_endpoint import (
+    router as consumer_router,
+)
+from trustyai_service.endpoints.consumer.consumer_endpoint import (
+    write_reconciled_data,
+)
+from trustyai_service.service.data.metadata.storage_metadata import (
+    StorageMetadata,
+    StorageMetadataConfig,
+)
+from trustyai_service.service.data.modelmesh_parser import (
+    ModelMeshPayloadParser,
+    PartialPayload,
+)
+from trustyai_service.service.payloads.service.schema import Schema
 
 
 class TestConsumerEndpointReconciliation(unittest.TestCase):
@@ -25,7 +40,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
 
         self.storage_patch = mock.patch(
-            "src.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
+            "trustyai_service.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
         )
         self.mock_get_storage = self.storage_patch.start()
         self.mock_storage = mock.AsyncMock()
@@ -50,7 +65,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
         self.mock_to_dataframe = self.parser_dataframe_patch.start()
 
         self.model_data_patch = mock.patch(
-            "src.endpoints.consumer.consumer_endpoint.ModelData",
+            "trustyai_service.endpoints.consumer.consumer_endpoint.ModelData",
         )
         self.mock_model_data = self.model_data_patch.start()
         self.mock_model_data.return_value.shapes.return_value = [
@@ -108,7 +123,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
             "kind": "request",
         }
 
-        response = self.client.post("/consumer/kserve/v2", json=inference_payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=inference_payload)
 
         assert response.status_code == HTTPStatus.OK
         assert response.json() == {
@@ -135,7 +150,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
             "kind": "response",
         }
 
-        response = self.client.post("/consumer/kserve/v2", json=inference_payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=inference_payload)
 
         assert response.status_code == HTTPStatus.OK
         assert response.json() == {
@@ -163,22 +178,22 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
 
         with (
             mock.patch(
-                "src.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.parse_input_payload",
+                "trustyai_service.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.parse_input_payload",
                 side_effect=lambda _x: True,
             ) as mock_parse_input,
             mock.patch(
-                "src.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.parse_output_payload",
+                "trustyai_service.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.parse_output_payload",
                 side_effect=ValueError("Not an output"),
             ) as mock_parse_output,
             mock.patch(
-                "src.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.payloads_to_dataframe",
+                "trustyai_service.endpoints.consumer.consumer_endpoint.ModelMeshPayloadParser.payloads_to_dataframe",
                 return_value=self.mock_df,
             ) as _mock_df,
             mock.patch(
-                "src.endpoints.consumer.consumer_endpoint.asyncio.gather",
+                "trustyai_service.endpoints.consumer.consumer_endpoint.asyncio.gather",
             ) as mock_gather,
             mock.patch(
-                "src.endpoints.consumer.consumer_endpoint.reconcile_modelmesh_payloads",
+                "trustyai_service.endpoints.consumer.consumer_endpoint.reconcile_modelmesh_payloads",
                 new=mock.AsyncMock(),
             ) as mock_reconcile,
         ):
@@ -196,7 +211,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
             }
 
             response_input = self.client.post(
-                "/consumer/kserve/v2",
+                routes.CONSUMER_KSERVE_V2,
                 json=input_inference_payload,
             )
 
@@ -225,7 +240,7 @@ class TestConsumerEndpointReconciliation(unittest.TestCase):
             }
 
             response_output = self.client.post(
-                "/consumer/kserve/v2",
+                routes.CONSUMER_KSERVE_V2,
                 json=output_inference_payload,
             )
 
@@ -272,7 +287,7 @@ class TestConsumerEndpointValidation(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test client with mocked storage."""
         self.storage_patch = mock.patch(
-            "src.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
+            "trustyai_service.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
         )
         self.mock_get_storage = self.storage_patch.start()
         self.mock_get_storage.return_value = mock.AsyncMock()
@@ -296,7 +311,7 @@ class TestConsumerEndpointValidation(unittest.TestCase):
         """Payload without 'id' field is rejected with 400."""
         payload = {**self.valid_payload}
         del payload["id"]
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "id" in response.json()["detail"]
 
@@ -304,7 +319,7 @@ class TestConsumerEndpointValidation(unittest.TestCase):
         """Payload without 'kind' field is rejected with 400."""
         payload = {**self.valid_payload}
         del payload["kind"]
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "kind" in response.json()["detail"]
 
@@ -312,7 +327,7 @@ class TestConsumerEndpointValidation(unittest.TestCase):
         """Payload without 'modelid' field is rejected with 400."""
         payload = {**self.valid_payload}
         del payload["modelid"]
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "modelid" in response.json()["detail"]
 
@@ -320,14 +335,14 @@ class TestConsumerEndpointValidation(unittest.TestCase):
         """Payload without 'data' field is rejected with 400."""
         payload = {**self.valid_payload}
         del payload["data"]
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "data" in response.json()["detail"]
 
     def test_invalid_kind_returns_422(self) -> None:
         """Invalid kind value is rejected by Pydantic with 422."""
         payload = {**self.valid_payload, "kind": "prediction"}
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
 
     def test_nested_format_returns_400(self) -> None:
@@ -337,9 +352,121 @@ class TestConsumerEndpointValidation(unittest.TestCase):
             "modelid": "test-model",
             "data": "dGVzdA==",
         }
-        response = self.client.post("/consumer/kserve/v2", json=payload)
+        response = self.client.post(routes.CONSUMER_KSERVE_V2, json=payload)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert "id" in response.json()["detail"]
+
+
+class TestWriteReconciledDataMetadata(unittest.TestCase):
+    """Test observation count behavior on cache miss vs cache hit."""
+
+    async def _test_cache_miss_no_double_count(self) -> None:
+        """First reconciliation (cache miss): observations come from storage, no increment."""
+        mock_storage = mock.AsyncMock()
+
+        real_metadata = StorageMetadata(
+            StorageMetadataConfig(
+                model_id="test-model",
+                input_schema=Schema(),
+                output_schema=Schema(),
+                observations=5,
+                recorded_inferences=False,
+            )
+        )
+
+        mock_data_source = mock.AsyncMock()
+        mock_data_source.get_metadata = mock.AsyncMock(return_value=real_metadata)
+        mock_data_source.metadata_cache = {}
+
+        input_array = np.zeros((5, 3))
+        output_array = np.zeros((5, 1))
+
+        with (
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
+                return_value=mock_storage,
+            ),
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.get_data_source",
+                return_value=mock_data_source,
+            ),
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.ModelData",
+            ) as mock_model_data,
+        ):
+            mock_model_data.return_value.shapes = mock.AsyncMock(
+                return_value=[(5, 3), (5, 1), (5, 4)]
+            )
+
+            await write_reconciled_data(
+                input_array=input_array,
+                input_names=["f1", "f2", "f3"],
+                output_array=output_array,
+                output_names=["out"],
+                model_id="test-model",
+                tags=["tag1"],
+                id_="req-123",
+            )
+
+        assert real_metadata.get_observations() == 5  # noqa: PLR2004
+
+    async def _test_cache_hit_increments(self) -> None:
+        """Subsequent reconciliation (cache hit): observations increment correctly."""
+        mock_storage = mock.AsyncMock()
+
+        real_metadata = StorageMetadata(
+            StorageMetadataConfig(
+                model_id="test-model",
+                input_schema=Schema(),
+                output_schema=Schema(),
+                observations=5,
+                recorded_inferences=True,
+            )
+        )
+
+        mock_data_source = mock.AsyncMock()
+        mock_data_source.get_metadata = mock.AsyncMock(return_value=real_metadata)
+        mock_data_source.metadata_cache = {"test-model": real_metadata}
+
+        input_array = np.zeros((5, 3))
+        output_array = np.zeros((5, 1))
+
+        with (
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.get_global_storage_interface",
+                return_value=mock_storage,
+            ),
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.get_data_source",
+                return_value=mock_data_source,
+            ),
+            mock.patch(
+                "trustyai_service.endpoints.consumer.consumer_endpoint.ModelData",
+            ) as mock_model_data,
+        ):
+            mock_model_data.return_value.shapes = mock.AsyncMock(
+                return_value=[(10, 3), (10, 1), (10, 4)]
+            )
+
+            await write_reconciled_data(
+                input_array=input_array,
+                input_names=["f1", "f2", "f3"],
+                output_array=output_array,
+                output_names=["out"],
+                model_id="test-model",
+                tags=["tag1"],
+                id_="req-456",
+            )
+
+        assert real_metadata.get_observations() == 10  # noqa: PLR2004
+
+
+TestWriteReconciledDataMetadata.test_cache_miss_no_double_count = (  # type: ignore[attr-defined]
+    lambda self: run_async_test(self._test_cache_miss_no_double_count())
+)
+TestWriteReconciledDataMetadata.test_cache_hit_increments = (  # type: ignore[attr-defined]
+    lambda self: run_async_test(self._test_cache_hit_increments())
+)
 
 
 if __name__ == "__main__":
