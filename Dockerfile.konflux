@@ -9,7 +9,7 @@ COPY pyproject.toml README.md ./
 ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0.dev0"
 
 RUN mkdir -p src/trustyai_service && \
-    pip install --no-cache-dir ".[mariadb]"
+    pip install --no-cache-dir ".[mariadb,mmd]"
 
 FROM ${CPU_BASE_IMAGE}
 
