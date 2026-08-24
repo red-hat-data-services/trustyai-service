@@ -10,19 +10,30 @@ from http import HTTPStatus
 from typing import Annotated, Never
 
 import numpy as np
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from numpy import ndarray
+from pydantic import TypeAdapter, ValidationError
 
+from trustyai_service.endpoints import routes
 from trustyai_service.endpoints.consumer import (
+    KSERVE_TO_DATATYPE,
     InferencePartialPayload,
     KServeData,
     KServeInferenceRequest,
     KServeInferenceResponse,
 )
+from trustyai_service.endpoints.consumer.gzip_utils import decompress_if_gzip
 from trustyai_service.exceptions import ReconciliationError
+from trustyai_service.service.constants import (
+    BIAS_IGNORE_PARAM,
+    DATA_TAG_PARAM,
+    INPUT_SUFFIX,
+    METADATA_SUFFIX,
+    OUTPUT_SUFFIX,
+    SYNTHETIC_TAG,
+    UNLABELED_TAG,
+)
 from trustyai_service.service.data.datasources.data_source import DataSource
-
-# Import local dependencies
 from trustyai_service.service.data.model_data import ModelData
 from trustyai_service.service.data.modelmesh_parser import (
     ModelMeshPayloadParser,
@@ -30,15 +41,9 @@ from trustyai_service.service.data.modelmesh_parser import (
 )
 from trustyai_service.service.data.shared_data_source import get_shared_data_source
 from trustyai_service.service.data.storage import get_global_storage_interface
+from trustyai_service.service.payloads.values.data_type import DataType
 from trustyai_service.service.utils import list_utils
-
-# Define constants locally to avoid import issues
-INPUT_SUFFIX = "_inputs"
-OUTPUT_SUFFIX = "_outputs"
-METADATA_SUFFIX = "_metadata"
-SYNTHETIC_TAG = "synthetic"
-UNLABELED_TAG = "unlabeled"
-BIAS_IGNORE_PARAM = "bias-ignore"
+from trustyai_service.service.validation import validate_data_tag
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -66,7 +71,7 @@ def _validate_payload_type(payload: object, expected_type: type) -> None:
         )
 
 
-@router.post("/consumer/kserve/v2")
+@router.post(routes.CONSUMER_KSERVE_V2)
 async def consume_inference_payload(
     payload: InferencePartialPayload,
 ) -> dict[str, str]:
@@ -258,18 +263,25 @@ async def write_reconciled_data(
     )
     logger.debug("DataSource instance id: %s", id(data_source))
 
-    # Mark that inference data has been recorded for this model
+    # Update metadata: mark inferences recorded and increment observation count.
+    # Only increment if metadata was already cached — on cache miss, get_metadata
+    # reads the correct count from storage (which already includes the new rows).
     try:
+        was_cached = model_id in data_source.metadata_cache
         metadata = await data_source.get_metadata(model_id)
         metadata.set_recorded_inferences(recorded_inferences=True)
+        if was_cached:
+            metadata.increment_observations(len(input_array))
     except (
         Exception
     ) as e:  # Intentional: metadata update is non-critical; continue on failure
-        logger.warning(
-            "Could not update recorded_inferences flag for model %s: %s", model_id, e
-        )
+        logger.warning("Could not update metadata for model %s: %s", model_id, e)
     else:
-        logger.info("Marked model %s as having recorded inferences", model_id)
+        logger.info(
+            "Updated metadata for model %s: recorded_inferences=True, observations=%d",
+            model_id,
+            metadata.get_observations(),
+        )
 
     # Clean up
     await storage_interface.delete_partial_payload(id_, is_input=True)
@@ -319,8 +331,10 @@ async def reconcile_kserve(
     :param output_payload: KServe inference response containing outputs
     :param tag: Optional tag to associate with the data
     """
-    input_array, input_names = process_payload(input_payload, lambda p: p.inputs)
-    output_array, output_names = process_payload(
+    input_array, input_names, input_types = process_payload(
+        input_payload, lambda p: p.inputs
+    )
+    output_array, output_names, output_types = process_payload(
         output_payload, lambda p: p.outputs, input_array.shape[0]
     )
 
@@ -343,6 +357,24 @@ async def reconcile_kserve(
         tags=tags,
         id_=input_payload.id,
     )
+
+    storage_interface = get_global_storage_interface()
+    input_dataset = output_payload.model_name + INPUT_SUFFIX
+    output_dataset = output_payload.model_name + OUTPUT_SUFFIX
+    try:
+        await storage_interface.set_column_types(
+            input_dataset, [t.value for t in input_types]
+        )
+        await storage_interface.set_column_types(
+            output_dataset, [t.value for t in output_types]
+        )
+    except (
+        Exception
+    ):  # Intentional: type metadata is non-critical; falls back to UNKNOWN on read
+        logger.exception(
+            "Failed to persist column types for model=%s",
+            output_payload.model_name,
+        )
 
 
 def reconcile_mismatching_shape_error(
@@ -387,13 +419,13 @@ def process_payload(
     payload: KServeInferenceRequest | KServeInferenceResponse,
     get_data: Callable,
     enforced_first_shape: int | None = None,
-) -> tuple[np.ndarray, list[str]]:
-    """Process a KServe payload and extract data array and column names.
+) -> tuple[np.ndarray, list[str], list[DataType]]:
+    """Process a KServe payload and extract data array, column names, and column types.
 
     :param payload: KServe request or response payload
     :param get_data: Function to extract inputs or outputs from payload
     :param enforced_first_shape: Expected number of rows (for validation)
-    :return: Tuple of (data array, column names list)
+    :return: Tuple of (data array, column names list, column types list)
     :raises ReconciliationError: If shapes don't match expectations
     """
     if (
@@ -403,10 +435,14 @@ def process_payload(
         shapes = set()
         shape_tuples = []
         column_names = []
+        column_types = []
         for kserve_data in get_data(payload):
             data.append(kserve_data.data)
             shapes.add(tuple(kserve_data.shape))
             column_names.append(kserve_data.name)
+            column_types.append(
+                KSERVE_TO_DATATYPE.get(kserve_data.datatype, DataType.UNKNOWN)
+            )
             shape_tuples.append((kserve_data.name, kserve_data.shape))
         if len(shapes) == 1:
             row_count = next(iter(shapes))[0]
@@ -415,8 +451,8 @@ def process_payload(
                     payload.id, enforced_first_shape, row_count
                 )
             if list_utils.contains_non_numeric(data):
-                return np.array(data, dtype="O").T, column_names
-            return np.array(data).T, column_names
+                return np.array(data, dtype="O").T, column_names, column_types
+            return np.array(data).T, column_names, column_types
         reconcile_mismatching_shape_error(
             shape_tuples,
             "input" if enforced_first_shape is None else "output",
@@ -438,28 +474,82 @@ def process_payload(
             ]
         else:
             column_names = [kserve_data.name]
+        mapped_type = KSERVE_TO_DATATYPE.get(kserve_data.datatype, DataType.UNKNOWN)
+        column_types = [mapped_type] * len(column_names)
         if list_utils.contains_non_numeric(kserve_data.data):
-            return np.array(kserve_data.data, dtype="O"), column_names
-        return np.array(kserve_data.data), column_names
+            return np.array(kserve_data.data, dtype="O"), column_names, column_types
+        return np.array(kserve_data.data), column_names, column_types
 
 
-@router.post("/")
-async def consume_cloud_event(
+_kserve_payload_adapter = TypeAdapter(KServeInferenceRequest | KServeInferenceResponse)
+
+
+def _store_tag_in_payload(
     payload: KServeInferenceRequest | KServeInferenceResponse,
-    ce_id: Annotated[str | None, Header()] = None,
+    tag: str | None,
+) -> None:
+    """Store a tag in the payload's parameters for later retrieval."""
+    if tag is not None:
+        if payload.parameters is None:
+            payload.parameters = {}
+        payload.parameters[DATA_TAG_PARAM] = tag
+
+
+def _get_tag_from_payload(
+    payload: KServeInferenceRequest | KServeInferenceResponse,
+) -> str | None:
+    """Extract the stored tag from a payload's parameters, or None if absent/invalid.
+
+    Validates tag format and rejects reserved prefixes. Invalid tags are ignored
+    (returns None) rather than raising errors to avoid breaking ingestion.
+    """
+    if not payload.parameters:
+        return None
+
+    tag = payload.parameters.get(DATA_TAG_PARAM)
+    if tag is None:
+        return None
+
+    # Validate tag - if invalid, log warning and ignore it
+    error_msg = validate_data_tag(tag)
+    if error_msg:
+        logger.warning(
+            "Ignoring invalid tag from KServe payload: %s (tag=%s)",
+            error_msg,
+            tag,
+        )
+        return None
+
+    return tag
+
+
+def _merge_tags(
+    current_tag: str | None,
+    stored_payload: KServeInferenceRequest | KServeInferenceResponse,
+) -> str | None:
+    """Merge current tag with stored tag, preferring current if both present."""
+    return (
+        current_tag
+        if current_tag is not None
+        else _get_tag_from_payload(stored_payload)
+    )
+
+
+async def process_cloud_event(
+    payload: KServeInferenceRequest | KServeInferenceResponse,
+    ce_id: str | None = None,
     tag: str | None = None,
 ) -> dict[str, str]:
-    """Consume KServe v2 payloads from cloud events.
+    """Process a KServe payload from a cloud event or internal call.
 
-    This endpoint accepts both input (request) and output (response) payloads
-    from ModelMesh-served models and stores them for reconciliation.
+    This is the core logic shared by the HTTP endpoint and the upload
+    endpoint's internal forwarding path.
 
-    :param payload: KServe inference request or response
-    :param ce_id: Cloud event ID from header
+    :param payload: Parsed KServe inference request or response
+    :param ce_id: Cloud event ID from header (overrides payload.id)
     :param tag: Optional tag to associate with the data
     :raises HTTPException: If payload processing fails
     """
-    # set payload id from cloud event header if present
     if ce_id is not None:
         payload.id = ce_id
 
@@ -469,7 +559,6 @@ async def consume_cloud_event(
             detail="Payload requires 'id' field or 'ce-id' header",
         )
 
-    # get global storage interface
     storage_interface = get_global_storage_interface()
 
     try:
@@ -481,19 +570,22 @@ async def consume_cloud_event(
                 )
                 raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=msg)
             logger.info("KServe Inference Input %s received.", payload.id)
-            # if a match is found, the payload is auto-deleted from data
+            # If a match is found, the partial payload is auto-deleted from storage
             partial_output = await storage_interface.get_partial_payload(
                 payload.id, is_input=False, is_modelmesh=False
             )
             if partial_output is not None:
                 if not isinstance(partial_output, KServeInferenceResponse):
-                    # This should never happen - indicates storage interface error
+                    # Should never happen — indicates storage interface error
                     raise HTTPException(
                         status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
                         detail="Invalid payload type from storage",
                     )
-                await reconcile_kserve(payload, partial_output, tag)
+                await reconcile_kserve(
+                    payload, partial_output, _merge_tags(tag, partial_output)
+                )
             else:
+                _store_tag_in_payload(payload, tag)
                 await storage_interface.persist_partial_payload(
                     payload, payload_id=payload.id, is_input=True
                 )
@@ -514,18 +606,22 @@ async def consume_cloud_event(
                 payload.id,
                 payload.model_name,
             )
+            # If a match is found, the partial payload is auto-deleted from storage
             partial_input = await storage_interface.get_partial_payload(
                 payload.id, is_input=True, is_modelmesh=False
             )
             if partial_input is not None:
                 if not isinstance(partial_input, KServeInferenceRequest):
-                    # This should never happen - indicates storage interface error
+                    # Should never happen — indicates storage interface error
                     raise HTTPException(
                         status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
                         detail="Invalid payload type from storage",
                     )
-                await reconcile_kserve(partial_input, payload, tag)
+                await reconcile_kserve(
+                    partial_input, payload, _merge_tags(tag, partial_input)
+                )
             else:
+                _store_tag_in_payload(payload, tag)
                 await storage_interface.persist_partial_payload(
                     payload, payload_id=payload.id, is_input=False
                 )
@@ -535,8 +631,7 @@ async def consume_cloud_event(
                 "message": f"Output payload {payload.id} processed successfully",
             }
 
-        # Defensive programming: this should never happen due to type annotation
-        # but adding explicit fallback for type safety
+        # Unreachable due to type annotation, but explicit fallback for type safety
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Payload must be either KServeInferenceRequest or KServeInferenceResponse",
@@ -545,3 +640,34 @@ async def consume_cloud_event(
     except ReconciliationError as e:
         logger.exception("Reconciliation failed for payload %s", payload.id)
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(e)) from e
+
+
+@router.post(routes.CONSUMER_ROOT)
+async def consume_cloud_event(
+    http_request: Request,
+    ce_id: Annotated[str | None, Header()] = None,
+    tag: str | None = None,
+) -> dict[str, str]:
+    """Consume KServe v2 payloads from cloud events.
+
+    Knative Eventing may strip the Content-Encoding header while leaving the
+    body gzip-compressed, so this endpoint detects gzip by magic bytes and
+    decompresses before JSON parsing.
+
+    :param http_request: Raw HTTP request (body may be gzip-compressed without header)
+    :param ce_id: Cloud event ID from header
+    :param tag: Optional tag to associate with the data
+    :raises HTTPException: If payload processing fails
+    """
+    raw_body = await http_request.body()
+    body = decompress_if_gzip(raw_body)
+
+    try:
+        payload = _kserve_payload_adapter.validate_json(body)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=f"Invalid payload: {e}",
+        ) from e
+
+    return await process_cloud_event(payload, ce_id=ce_id, tag=tag)

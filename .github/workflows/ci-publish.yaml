@@ -10,6 +10,7 @@ permissions: read-all
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: ci-publish
     if: github.event.workflow_run.conclusion == 'success'
     permissions:
       actions: read
@@ -144,7 +145,7 @@ jobs:
 
       - name: Update Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@e0647621c2984b5ed2f768cb892365bf2a616ad1 # v3
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v3
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-ci-scan'
