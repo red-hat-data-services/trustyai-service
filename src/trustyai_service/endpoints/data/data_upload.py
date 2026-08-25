@@ -7,14 +7,15 @@ from http import HTTPStatus
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from trustyai_service.endpoints import routes
 from trustyai_service.endpoints.consumer import (
     KServeInferenceRequest,
     KServeInferenceResponse,
 )
-from trustyai_service.endpoints.consumer.consumer_endpoint import consume_cloud_event
+from trustyai_service.endpoints.consumer.consumer_endpoint import process_cloud_event
 from trustyai_service.exceptions import ReconciliationError
-from trustyai_service.service.constants import TRUSTYAI_TAG_PREFIX
 from trustyai_service.service.data.model_data import ModelData
+from trustyai_service.service.validation import validate_data_tag
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,19 +33,7 @@ class UploadPayload(BaseModel):
     response: KServeInferenceResponse
 
 
-def validate_data_tag(tag: str | None) -> str | None:
-    """Validate data tag format and content."""
-    if not tag:
-        return None
-    if tag.startswith(TRUSTYAI_TAG_PREFIX):
-        return (
-            f"The tag prefix '{TRUSTYAI_TAG_PREFIX}' is reserved for internal TrustyAI use only. "
-            f"Provided tag '{tag}' violates this restriction."
-        )
-    return None
-
-
-@router.post("/data/upload")
+@router.post(routes.DATA_UPLOAD)
 async def upload(payload: UploadPayload) -> dict[str, str]:
     """Upload model data."""
     # validate tag
@@ -84,8 +73,8 @@ async def upload(payload: UploadPayload) -> dict[str, str]:
         else:
             previous_data_points = 0
 
-        await consume_cloud_event(payload.response, req_id)
-        await consume_cloud_event(payload.request, req_id, tag=payload.data_tag)
+        await process_cloud_event(payload.response, req_id)
+        await process_cloud_event(payload.request, req_id, tag=payload.data_tag)
 
         model_data = ModelData(payload.model_name)
         new_data_points = (await model_data.row_counts())[0]
