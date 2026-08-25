@@ -5,8 +5,9 @@ import uuid
 from http import HTTPStatus
 from typing import Any, Literal, cast
 
+import pandas as pd
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from trustyai_service.core.metrics.drift.jensen_shannon import (
     DEFAULT_BINS,
@@ -16,6 +17,8 @@ from trustyai_service.core.metrics.drift.jensen_shannon import (
     DEFAULT_THRESHOLD,
     JensenShannon,
 )
+from trustyai_service.endpoints import routes
+from trustyai_service.endpoints.metrics.drift.validation import validate_drift_request
 from trustyai_service.service.data.shared_data_source import (
     DataSource,
     get_shared_data_source,
@@ -23,6 +26,7 @@ from trustyai_service.service.data.shared_data_source import (
 from trustyai_service.service.payloads.metrics.base_metric_request import (
     BaseMetricRequest,
 )
+from trustyai_service.service.prometheus.metric_value_carrier import MetricValueCarrier
 from trustyai_service.service.prometheus.prometheus_scheduler import PrometheusScheduler
 from trustyai_service.service.prometheus.shared_prometheus_scheduler import (
     get_shared_prometheus_scheduler,
@@ -58,7 +62,7 @@ class JensenShannonMetricRequest(BaseMetricRequest):
     model_config = ConfigDict(populate_by_name=True)
 
     model_id: str = Field(alias="modelId")
-    metric_name: str | None = Field(default=None, alias="metricName")
+    metric_name: str = Field(default=METRIC_NAME, alias="metricName")
     request_name: str | None = Field(default=None, alias="requestName")
     batch_size: int = Field(default=100, alias="batchSize")
 
@@ -79,14 +83,7 @@ class JensenShannonMetricRequest(BaseMetricRequest):
         default=DEFAULT_BINS, alias="bins"
     )  # Number of bins for histogram method
     reference_tag: str | None = Field(default=None, alias="referenceTag")
-    fit_columns: list[str] = Field(default_factory=list, alias="fitColumns")
-
-    @model_validator(mode="after")
-    def _set_default_metric_name(self) -> "JensenShannonMetricRequest":
-        """Automatically set metric_name to default if not provided."""
-        if self.metric_name is None:
-            self.metric_name = METRIC_NAME
-        return self
+    fit_columns: list[str] | None = Field(default=None, alias="fitColumns")
 
     def retrieve_tags(self) -> dict[str, str]:
         """Retrieve tags for this JensenShannon metric request."""
@@ -98,27 +95,13 @@ class JensenShannonMetricRequest(BaseMetricRequest):
         return tags
 
 
-@router.post("/metrics/drift/jensenshannon")
+@router.post(routes.DRIFT_JENSEN_SHANNON.compute)
 async def compute_jensenshannon(
     request: JensenShannonMetricRequest,
 ) -> dict[str, float | bool | str | dict[str, dict[str, float | bool]]]:
     """Compute the current value of Jensen-Shannon metric."""
-    # Validate inputs before try block
-    if not request.reference_tag:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="referenceTag is required for drift detection",
-        )
-
-    if not request.fit_columns:
-        data_source = get_data_source()
-        metadata = await data_source.get_metadata(request.model_id)
-        request.fit_columns = list(metadata.input_schema.items.keys())
-        logger.info(
-            "fitColumns not specified, using all input columns for model %s: %s",
-            request.model_id,
-            request.fit_columns,
-        )
+    # Validate drift request fields (modifies request.fit_columns in-place)
+    await validate_drift_request(request)
 
     try:
         logger.info("Computing %s for model: %s", METRIC_NAME, request.model_id)
@@ -209,7 +192,7 @@ async def compute_jensenshannon(
         ) from e
 
 
-@router.get("/metrics/drift/jensenshannon/definition")
+@router.get(routes.DRIFT_JENSEN_SHANNON.definition)
 async def get_jensenshannon_definition() -> dict[str, str]:
     """Provide a general definition of Jensen-Shannon metric."""
     description = """The Jensen-Shannon divergence is a symmetric
@@ -229,25 +212,11 @@ async def get_jensenshannon_definition() -> dict[str, str]:
     }
 
 
-@router.post("/metrics/drift/jensenshannon/request")
+@router.post(routes.DRIFT_JENSEN_SHANNON.request)
 async def schedule_jensenshannon(request: JensenShannonMetricRequest) -> dict[str, str]:
     """Schedule a recurring computation of Jensen-Shannon metric."""
-    # Validate inputs before scheduling
-    if not request.reference_tag:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="referenceTag is required for drift detection",
-        )
-
-    if not request.fit_columns:
-        data_source = get_data_source()
-        metadata = await data_source.get_metadata(request.model_id)
-        request.fit_columns = list(metadata.input_schema.items.keys())
-        logger.info(
-            "fitColumns not specified, using all input columns for model %s: %s",
-            request.model_id,
-            request.fit_columns,
-        )
+    # Validate drift request fields (modifies request.fit_columns in-place)
+    await validate_drift_request(request)
 
     # Get the scheduler and validate availability
     scheduler = get_prometheus_scheduler()
@@ -281,7 +250,7 @@ async def schedule_jensenshannon(request: JensenShannonMetricRequest) -> dict[st
         return {"requestId": str(request_id)}
 
 
-@router.delete("/metrics/drift/jensenshannon/request")
+@router.delete(routes.DRIFT_JENSEN_SHANNON.request)
 async def delete_jensenshannon_schedule(schedule: ScheduleId) -> dict[str, str]:
     """Delete a recurring computation of Jensen-Shannon metric."""
     # Get the scheduler and validate availability
@@ -326,7 +295,7 @@ async def delete_jensenshannon_schedule(schedule: ScheduleId) -> dict[str, str]:
         }
 
 
-@router.get("/metrics/drift/jensenshannon/requests")
+@router.get(routes.DRIFT_JENSEN_SHANNON.requests)
 async def list_jensenshannon_requests() -> dict[str, list[dict[str, Any]]]:
     """List the currently scheduled computations of Jensen-Shannon metric."""
     # Get the scheduler and validate availability
@@ -353,6 +322,7 @@ async def list_jensenshannon_requests() -> dict[str, list[dict[str, Any]]]:
             ):
                 requests_list.append(
                     {
+                        "id": str(request_id),  # deprecated: use requestId
                         "requestId": str(request_id),
                         "modelId": request.model_id,
                         "metricName": METRIC_NAME,
@@ -387,3 +357,51 @@ async def list_jensenshannon_requests() -> dict[str, list[dict[str, Any]]]:
         ) from e
     else:
         return {"requests": requests_list}
+
+
+async def calculate_jensenshannon_metric(
+    batch: pd.DataFrame,
+    request: BaseMetricRequest,
+) -> MetricValueCarrier:
+    """Calculate JensenShannon metric for the Prometheus scheduler."""
+    data_source = get_data_source()
+    reference_df = await data_source.get_dataframe_by_tag(
+        request.model_id, request.reference_tag
+    )
+    fit_columns = request.fit_columns or list(batch.columns)
+    statistic = getattr(request, "statistic", DEFAULT_STATISTIC)
+    threshold = getattr(request, "threshold", DEFAULT_THRESHOLD)
+    method = getattr(request, "method", DEFAULT_METHOD)
+    grid_points = getattr(request, "grid_points", DEFAULT_GRID_POINTS)
+    bins = getattr(request, "bins", DEFAULT_BINS)
+
+    named_values = {}
+    for feature_name in fit_columns:
+        if feature_name in reference_df.columns and feature_name in batch.columns:
+            result = JensenShannon.jensenshannon(
+                data_ref=reference_df[feature_name].to_numpy(),
+                data_cur=batch[feature_name].to_numpy(),
+                statistic=cast("Literal['distance', 'divergence']", statistic),
+                threshold=threshold,
+                method=cast("Literal['kde', 'hist']", method),
+                grid_points=grid_points,
+                bins=bins,
+            )
+            named_values[feature_name] = result["Jensen-Shannon_distance"]
+    return MetricValueCarrier(named_values or 0.0)
+
+
+def _register_jensenshannon_calculator() -> None:
+    """Register the JensenShannon calculator with the metrics directory."""
+    scheduler = get_prometheus_scheduler()
+    if scheduler and scheduler.metrics_directory:
+        scheduler.metrics_directory.register(
+            METRIC_NAME, calculate_jensenshannon_metric
+        )
+        logger.info("%s calculator registered with metrics directory", METRIC_NAME)
+
+
+try:
+    _register_jensenshannon_calculator()
+except (AttributeError, TypeError) as e:
+    logger.warning("Could not register %s calculator on import: %s", METRIC_NAME, e)
