@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from trustyai_service.service.constants import UNLABELED_TAG
+from trustyai_service.service.constants import SYNTHETIC_TAG
 from trustyai_service.service.data.datasources.data_source import DataSource
 from trustyai_service.service.data.exceptions import (
     DataframeCreateError,
@@ -179,20 +179,19 @@ class TestDataSource:
 
     @patch("trustyai_service.service.data.datasources.data_source.ModelData")
     @pytest.mark.asyncio
-    async def test_get_organic_dataframe_filters_unlabeled(
+    async def test_get_organic_dataframe_filters_synthetic(
         self,
         mock_model_data_class: Mock,
         data_source: DataSource,
         mock_model_data: Mock,
     ) -> None:
-        """Test that organic dataframe filters out unlabeled (synthetic) data."""
+        """Test that organic dataframe filters out synthetic data."""
         mock_model_data_class.return_value = mock_model_data
 
-        # Add unlabeled column to mock data
         mock_model_data.column_names.return_value = (
             ["feature1", "feature2"],
             ["target"],
-            [UNLABELED_TAG],
+            [SYNTHETIC_TAG],
         )
         mock_model_data.data.return_value = (
             np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
@@ -204,7 +203,7 @@ class TestDataSource:
 
         # Should filter out synthetic rows
         assert len(df) == EXPECTED_ORGANIC_ROWS
-        assert not df[UNLABELED_TAG].any()  # No True values should remain
+        assert not df[SYNTHETIC_TAG].any()  # No True values should remain
 
     @patch("trustyai_service.service.data.datasources.data_source.ModelData")
     @pytest.mark.asyncio
@@ -431,3 +430,163 @@ class TestDataSource:
         call_args = mock_model_data.data.call_args[1]
         assert call_args["start_row"] == 0  # Should start from beginning
         assert call_args["n_rows"] == EXPECTED_AVAILABLE_ROWS
+
+
+class TestGetDataframeByTag:
+    """Tests for DataSource.get_dataframe_by_tag."""
+
+    @pytest.fixture
+    def data_source(self) -> DataSource:
+        """Create a DataSource instance."""
+        return DataSource()
+
+    @patch("trustyai_service.service.data.datasources.data_source.ModelData")
+    @pytest.mark.asyncio
+    async def test_returns_only_matching_rows(
+        self, mock_model_data_class: Mock, data_source: DataSource
+    ) -> None:
+        """Rows tagged TRAINING are returned; unlabeled rows are excluded."""
+        mock = Mock(spec=ModelData)
+        mock.column_names = AsyncMock(
+            return_value=(
+                np.array(["feature1", "feature2"]),
+                np.array(["output"]),
+                np.array(["id", "iso_time", "unix_timestamp", "tags"]),
+            ),
+        )
+        mock.data = AsyncMock(
+            return_value=(
+                np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+                np.array([[0.0], [1.0], [0.0]]),
+                np.array(
+                    [
+                        ["id_0", "t0", 0.0, ["TRAINING"]],
+                        ["id_1", "t1", 1.0, ["unlabeled"]],
+                        ["id_2", "t2", 2.0, ["TRAINING"]],
+                    ],
+                    dtype=object,
+                ),
+            ),
+        )
+        mock_model_data_class.return_value = mock
+
+        df = await data_source.get_dataframe_by_tag("test-model", "TRAINING")
+
+        assert len(df) == 2  # noqa: PLR2004
+        assert list(df.columns) == ["feature1", "feature2", "output"]
+        assert df["feature1"].tolist() == [1.0, 5.0]
+        assert df["feature2"].tolist() == [2.0, 6.0]
+        assert df["output"].tolist() == [0.0, 0.0]
+
+    @patch("trustyai_service.service.data.datasources.data_source.ModelData")
+    @pytest.mark.asyncio
+    async def test_returns_empty_for_nonexistent_tag(
+        self, mock_model_data_class: Mock, data_source: DataSource
+    ) -> None:
+        """Non-existent tag returns empty DataFrame."""
+        mock = Mock(spec=ModelData)
+        mock.column_names = AsyncMock(
+            return_value=(
+                np.array(["feature1"]),
+                np.array(["output"]),
+                np.array(["id", "iso_time", "unix_timestamp", "tags"]),
+            ),
+        )
+        mock.data = AsyncMock(
+            return_value=(
+                np.array([[1.0], [2.0]]),
+                np.array([[0.0], [1.0]]),
+                np.array(
+                    [
+                        ["id_0", "t0", 0.0, ["unlabeled"]],
+                        ["id_1", "t1", 1.0, ["unlabeled"]],
+                    ],
+                    dtype=object,
+                ),
+            ),
+        )
+        mock_model_data_class.return_value = mock
+
+        df = await data_source.get_dataframe_by_tag("test-model", "TRAINING")
+
+        assert len(df) == 0
+
+    @patch("trustyai_service.service.data.datasources.data_source.ModelData")
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_data(
+        self, mock_model_data_class: Mock, data_source: DataSource
+    ) -> None:
+        """Missing data returns empty DataFrame."""
+        mock = Mock(spec=ModelData)
+        mock.column_names = AsyncMock(
+            return_value=(np.array([]), np.array([]), np.array([])),
+        )
+        mock.data = AsyncMock(return_value=(None, None, None))
+        mock_model_data_class.return_value = mock
+
+        df = await data_source.get_dataframe_by_tag("test-model", "TRAINING")
+
+        assert len(df) == 0
+
+    @patch("trustyai_service.service.data.datasources.data_source.ModelData")
+    @pytest.mark.asyncio
+    async def test_handles_numpy_array_tags_from_mariadb(
+        self, mock_model_data_class: Mock, data_source: DataSource
+    ) -> None:
+        """Tags stored as numpy arrays (MariaDB round-trip) are handled."""
+        mock = Mock(spec=ModelData)
+        mock.column_names = AsyncMock(
+            return_value=(
+                np.array(["feature1"]),
+                np.array(["output"]),
+                np.array(["id", "iso_time", "unix_timestamp", "tags"]),
+            ),
+        )
+        mock.data = AsyncMock(
+            return_value=(
+                np.array([[1.0], [2.0], [3.0]]),
+                np.array([[0.0], [1.0], [0.0]]),
+                np.array(
+                    [
+                        ["id_0", "t0", 0.0, np.array(["TRAINING"])],
+                        ["id_1", "t1", 1.0, np.array(["unlabeled"])],
+                        ["id_2", "t2", 2.0, np.array(["TRAINING"])],
+                    ],
+                    dtype=object,
+                ),
+            ),
+        )
+        mock_model_data_class.return_value = mock
+
+        df = await data_source.get_dataframe_by_tag("test-model", "TRAINING")
+
+        assert len(df) == 2  # noqa: PLR2004
+        assert df["feature1"].tolist() == [1.0, 3.0]
+        assert df["output"].tolist() == [0.0, 0.0]
+
+    @patch("trustyai_service.service.data.datasources.data_source.ModelData")
+    @pytest.mark.asyncio
+    async def test_handles_1d_metadata_returns_empty(
+        self, mock_model_data_class: Mock, data_source: DataSource
+    ) -> None:
+        """1D metadata (no tags column) returns empty DataFrame."""
+        mock = Mock(spec=ModelData)
+        mock.column_names = AsyncMock(
+            return_value=(
+                np.array(["feature1"]),
+                np.array(["output"]),
+                np.array(["id"]),
+            ),
+        )
+        mock.data = AsyncMock(
+            return_value=(
+                np.array([[1.0], [2.0]]),
+                np.array([[0.0], [1.0]]),
+                np.array(["id_0", "id_1"]),
+            ),
+        )
+        mock_model_data_class.return_value = mock
+
+        df = await data_source.get_dataframe_by_tag("test-model", "TRAINING")
+
+        assert len(df) == 0

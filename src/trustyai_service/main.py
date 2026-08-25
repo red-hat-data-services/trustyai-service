@@ -7,21 +7,20 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
-
-from trustyai_service import __version__
-
-if TYPE_CHECKING:
-    from fastapi import APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from hypercorn.asyncio import serve
-from hypercorn.config import Config
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from trustyai_service.endpoints import routes
+
 # Endpoint routers
+from trustyai_service.endpoints.consumer.consumer_endpoint import (
+    consume_inference_payload,
+)
 from trustyai_service.endpoints.consumer.consumer_endpoint import (
     router as consumer_router,
 )
@@ -34,14 +33,8 @@ from trustyai_service.endpoints.explainers.local_explainer import (
 )
 from trustyai_service.endpoints.metadata import router as metadata_router
 from trustyai_service.endpoints.metrics.batch_mean import router as batch_mean_router
-from trustyai_service.endpoints.metrics.drift.approx_ks_test import (
-    router as drift_approxkstest_router,
-)
 from trustyai_service.endpoints.metrics.drift.compare_means import (
     router as drift_comparemeans_router,
-)
-from trustyai_service.endpoints.metrics.drift.fourier_mmd import (
-    router as drift_fouriermmd_router,
 )
 from trustyai_service.endpoints.metrics.drift.jensen_shannon import (
     router as drift_jensenshannon_router,
@@ -49,6 +42,10 @@ from trustyai_service.endpoints.metrics.drift.jensen_shannon import (
 from trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov import (
     router as drift_kstest_router,
 )
+from trustyai_service.endpoints.metrics.drift.kolmogorov_smirnov_streaming import (
+    router as drift_ksteststreaming_router,
+)
+from trustyai_service.endpoints.metrics.drift.mmd import router as drift_mmd_router
 from trustyai_service.endpoints.metrics.fairness.group.dir import router as dir_router
 from trustyai_service.endpoints.metrics.fairness.group.spd import router as spd_router
 from trustyai_service.endpoints.metrics.metrics_info import (
@@ -57,19 +54,24 @@ from trustyai_service.endpoints.metrics.metrics_info import (
 
 # Middleware
 from trustyai_service.middleware.gzip_middleware import GzipRequestMiddleware
+
+# Feature flag gating
+from trustyai_service.service.config.registry import (
+    register_if_enabled,
+    register_if_enabled_with_group,
+    register_with_legacy_prefix,
+)
+
+# Health checks
+from trustyai_service.service.health_checks import (
+    STATUS_OK,
+    perform_liveness_checks,
+    perform_readiness_checks,
+)
 from trustyai_service.service.prometheus.shared_prometheus_scheduler import (
     get_shared_prometheus_scheduler,
 )
-
-lm_evaluation_harness_router: "APIRouter | None" = None
-try:
-    from trustyai_service.endpoints.evaluation.lm_evaluation_harness import router
-
-    lm_evaluation_harness_router = router
-except ImportError:
-    # LM evaluation harness requires optional 'eval' extra dependencies
-    # ImportError (not ModuleNotFoundError) because the module may exist but fail to import
-    pass
+from trustyai_service.service.tls import PolicyAwareConfig
 
 logging.basicConfig(
     level=logging.INFO,  # Reduce default verbosity
@@ -132,7 +134,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="TrustyAI Service API",
-    version=__version__,
+    version="1.0.0rc0",
     description="TrustyAI Service API",
     lifespan=lifespan,
 )
@@ -161,63 +163,85 @@ async def strip_trailing_slash(
     return await call_next(request)
 
 
-# Include all routers
+# Include core routers (always registered)
 app.include_router(
     consumer_router,
     tags=["{Internal Only} Inference Consumer", "{Internal Only} ModelMesh Consumer"],
 )
-app.include_router(dir_router, tags=["Fairness Metrics: Group: Disparate Impact Ratio"])
 app.include_router(data_upload_router, tags=["Data Upload"])
-
-#   Drift metrics
-app.include_router(
-    drift_comparemeans_router,
-    tags=[
-        "Drift Metrics: CompareMeans",
-    ],
-)
-app.include_router(
-    drift_kstest_router,
-    tags=[
-        "Drift Metrics: KSTest",
-    ],
-)
-app.include_router(
-    drift_fouriermmd_router,
-    tags=["Drift Metrics: FourierMMD"],
-)
-app.include_router(
-    drift_approxkstest_router,
-    tags=["Drift Metrics: ApproxKSTest"],
-)
-app.include_router(
-    drift_jensenshannon_router,
-    tags=["Drift Metrics: JensenShannon"],
-)
-
-app.include_router(explainers_global_router, tags=["Explainers: Global"])
-app.include_router(explainers_local_router, tags=["Explainers: Local"])
-app.include_router(
-    spd_router,
-    tags=["Fairness Metrics: Group: Statistical Parity Difference"],
-)
 app.include_router(batch_mean_router, tags=["Metrics: Batch Mean"])
 app.include_router(metadata_router, tags=["Service Metadata"])
 app.include_router(metrics_info_router, tags=["Metrics Information Endpoint"])
 
-if lm_evaluation_harness_router is not None:
-    app.include_router(
-        lm_evaluation_harness_router, tags=["LM Evaluation Harness Endpoint"]
-    )
-
-# Deprecated endpoints
-app.include_router(
-    dir_router, prefix="/metrics", tags=["{Legacy}: Disparate Impact Ratio"]
+# Fairness metrics (feature-flag gated, with legacy /metrics prefix)
+register_with_legacy_prefix(
+    app,
+    dir_router,
+    "fairness",
+    "fairness_dir",
+    modern_tag="Fairness Metrics: Group: Disparate Impact Ratio",
+    legacy_tag="{Legacy}: Disparate Impact Ratio",
 )
-app.include_router(
+register_with_legacy_prefix(
+    app,
     spd_router,
-    prefix="/metrics",
-    tags=["{Legacy}: Statistical Parity Difference"],
+    "fairness",
+    "fairness_spd",
+    modern_tag="Fairness Metrics: Group: Statistical Parity Difference",
+    legacy_tag="{Legacy}: Statistical Parity Difference",
+)
+
+# Drift metrics (feature-flag gated)
+register_if_enabled_with_group(
+    app,
+    drift_comparemeans_router,
+    "drift",
+    "drift_compare_means",
+    tag="Drift Metrics: CompareMeans",
+)
+register_if_enabled_with_group(
+    app,
+    drift_mmd_router,
+    "drift",
+    "drift_mmd",
+    tag="Drift Metrics: MMD",
+)
+register_if_enabled_with_group(
+    app,
+    drift_jensenshannon_router,
+    "drift",
+    "drift_jensen_shannon",
+    tag="Drift Metrics: JensenShannon",
+)
+register_if_enabled_with_group(
+    app,
+    drift_kstest_router,
+    "drift",
+    "drift_ks_test",
+    tag="Drift Metrics: KSTest",
+)
+# KSTestStreaming doesn't have its own flag yet, gate with drift group
+register_if_enabled(
+    app,
+    drift_ksteststreaming_router,
+    "drift",
+    tag="Drift Metrics: KSTestStreaming",
+)
+
+# Explainer endpoints (feature-flag gated, disabled by default)
+register_if_enabled_with_group(
+    app,
+    explainers_global_router,
+    "explainer",
+    "explainer_global",
+    tag="Explainers: Global",
+)
+register_if_enabled_with_group(
+    app,
+    explainers_local_router,
+    "explainer",
+    "explainer_local",
+    tag="Explainers: Local",
 )
 
 
@@ -230,7 +254,7 @@ async def root() -> dict[str, str]:
     return {"message": "Welcome to TrustyAI Explainability Service"}
 
 
-@app.get("/q/metrics")
+@app.get(routes.PROMETHEUS_METRICS)
 async def metrics(_request: Request) -> Response:
     """Prometheus metrics endpoint.
 
@@ -240,24 +264,77 @@ async def metrics(_request: Request) -> Response:
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+@app.get(routes.HEALTH)
+def general_health() -> JSONResponse:
+    """General health endpoint combining readiness and liveness checks.
+
+    :return: JSON response with status ("healthy" or "unhealthy")
+             HTTP 200 if healthy, HTTP 503 if unhealthy
+    """
+    readiness_status, readiness_checks = perform_readiness_checks()
+    liveness_status, liveness_checks = perform_liveness_checks()
+
+    is_healthy = readiness_status == STATUS_OK and liveness_status == STATUS_OK
+
+    response_body = {
+        "status": "healthy" if is_healthy else "unhealthy",
+        "checks": {
+            "readiness": readiness_checks,
+            "liveness": liveness_checks,
+        },
+    }
+
+    status_code = HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE
+    return JSONResponse(content=response_body, status_code=status_code)
+
+
 # Readiness probe
-@app.get("/q/health/ready")
-async def readiness_probe() -> JSONResponse:
+@app.get(routes.HEALTH_READY)
+def readiness_probe() -> JSONResponse:
     """Kubernetes readiness probe endpoint.
 
-    :return: JSON response indicating service is ready
+    :return: JSON response with status ("ready" or "not_ready")
+             HTTP 200 if ready, HTTP 503 if not ready
     """
-    return JSONResponse(content={"status": "ready"}, status_code=HTTPStatus.OK)
+    status, checks = perform_readiness_checks()
+    is_ready = status == STATUS_OK
+
+    response_body = {"status": "ready" if is_ready else "not_ready", "checks": checks}
+
+    status_code = HTTPStatus.OK if is_ready else HTTPStatus.SERVICE_UNAVAILABLE
+    return JSONResponse(content=response_body, status_code=status_code)
 
 
 # Liveness probe endpoint
-@app.get("/q/health/live")
-async def liveness_probe() -> JSONResponse:
+@app.get(routes.HEALTH_LIVE)
+def liveness_probe() -> JSONResponse:
     """Kubernetes liveness probe endpoint.
 
-    :return: JSON response indicating service is alive
+    :return: JSON response with status ("alive")
+             HTTP 200 if alive
     """
-    return JSONResponse(content={"status": "live"}, status_code=HTTPStatus.OK)
+    status, checks = perform_liveness_checks()
+    is_alive = status == STATUS_OK
+
+    response_body = {"status": "alive" if is_alive else "dead", "checks": checks}
+
+    status_code = HTTPStatus.OK if is_alive else HTTPStatus.SERVICE_UNAVAILABLE
+    return JSONResponse(content=response_body, status_code=status_code)
+
+
+health_app = FastAPI(
+    title="TrustyAI Health",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
+health_app.get(routes.HEALTH)(general_health)
+health_app.get(routes.HEALTH_READY)(readiness_probe)
+health_app.get(routes.HEALTH_LIVE)(liveness_probe)
+
+# Register only the KServe consumer endpoint (not the entire router) to avoid
+# exposing unwanted routes like "/" on the health port
+health_app.post(routes.CONSUMER_KSERVE_V2)(consume_inference_payload)
 
 
 def get_tls_config() -> dict[str, Any] | None:
@@ -277,7 +354,6 @@ def get_tls_config() -> dict[str, Any] | None:
         return {
             "ssl_keyfile": str(key_path),
             "ssl_certfile": str(cert_path),
-            "ssl_version": 2,  # TLS v1.2+
         }
     logger.info("TLS certificates not found, running in HTTP mode")
     return None
@@ -293,11 +369,20 @@ async def run_server() -> None:
     host_http = (
         "127.0.0.1"  # Keep loopback-only for security (kube-rbac-proxy forwards here)
     )
-    http_port = int(os.getenv("HTTP_PORT", "8080"))
+    http_port = int(os.getenv("HTTP_PORT", "8081"))
     ssl_port = int(os.getenv("SSL_PORT", "4443"))
+    health_port = int(os.getenv("HEALTH_PORT", "8080"))
+
+    if health_port in (http_port, ssl_port):
+        msg = f"HEALTH_PORT ({health_port}) must differ from HTTP_PORT ({http_port}) and SSL_PORT ({ssl_port})"
+        raise ValueError(msg)
+
+    if http_port == ssl_port:
+        msg = f"HTTP_PORT ({http_port}) must differ from SSL_PORT ({ssl_port})"
+        raise ValueError(msg)
 
     # Create hypercorn config
-    config = Config()
+    config = PolicyAwareConfig()
 
     # HTTP for kube-rbac-proxy (plain HTTP on insecure_bind)
     config.insecure_bind = [f"{host_http}:{http_port}"]
@@ -322,10 +407,15 @@ async def run_server() -> None:
     config.errorlog = "-"  # Log to stderr
     config.use_reloader = False  # Disable reloader in production
 
-    # Start the server
-    # FastAPI implements the ASGI protocol that hypercorn expects
-    # The type stubs are overly strict, but FastAPI works correctly at runtime
-    await serve(app, config)  # type: ignore[arg-type]
+    health_config = PolicyAwareConfig()
+    health_config.bind = [f"0.0.0.0:{health_port}"]
+    health_config.use_reloader = False
+    logger.info("Binding health probes on 0.0.0.0:%s for kubelet", health_port)
+
+    await asyncio.gather(
+        serve(app, config),  # type: ignore[arg-type]
+        serve(health_app, health_config),  # type: ignore[arg-type]
+    )
 
 
 if __name__ == "__main__":

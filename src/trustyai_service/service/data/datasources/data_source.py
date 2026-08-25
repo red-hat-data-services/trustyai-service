@@ -3,12 +3,17 @@
 import logging
 import os
 
+import numpy as np
 import pandas as pd
 
 from trustyai_service.service.constants import (
     GROUND_TRUTH_SUFFIX,
+    INPUT_SUFFIX,
     INTERNAL_DATA_FILENAME,
     METADATA_FILENAME,
+    OUTPUT_SUFFIX,
+    SYNTHETIC_TAG,
+    TAGS_COLUMN,
     UNLABELED_TAG,
 )
 from trustyai_service.service.data.exceptions import (
@@ -26,6 +31,17 @@ from trustyai_service.service.payloads.service.schema_item import SchemaItem
 from trustyai_service.service.payloads.values.data_type import DataType
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def _safe_datatype(types: list[str] | None, index: int) -> DataType:
+    """Look up a DataType from a stored types list, defaulting to UNKNOWN."""
+    if types is None or index >= len(types):
+        return DataType.UNKNOWN
+    try:
+        return DataType(types[index])
+    except ValueError:
+        return DataType.UNKNOWN
+
 
 # Array dimensionality constants for NumPy shape checks
 ARRAY_DIM_2D = 2
@@ -168,11 +184,134 @@ class DataSource:
         """
         df = await self.get_dataframe_with_batch_size(model_id, batch_size)
 
-        # Filter out any rows with the unlabeled tag (synthetic data)
-        if UNLABELED_TAG in df.columns:
-            df = df[~df[UNLABELED_TAG].fillna(value=False)]
+        # Filter out synthetic rows — check if SYNTHETIC_TAG is in the tags list.
+        # For backward compatibility, also check for legacy boolean columns and legacy tag values.
+        if "tags" in df.columns:
+            # Current format: tags is a list, check if SYNTHETIC_TAG or legacy "synthetic" is in it
+            # Normalize tags to handle NumPy arrays that cause ambiguous truth value errors
+            def _normalize_tags(tags_cell: object) -> list:
+                """Convert tags cell to list, handling NumPy arrays."""
+                if isinstance(tags_cell, np.ndarray):
+                    return tags_cell.tolist()
+                if isinstance(tags_cell, list):
+                    return tags_cell
+                if tags_cell is None:
+                    return []
+                return [tags_cell]
+
+            df = df[
+                ~df["tags"].apply(
+                    lambda tags_cell: (
+                        SYNTHETIC_TAG in _normalize_tags(tags_cell)
+                        or "synthetic" in _normalize_tags(tags_cell)
+                    )
+                )
+            ]
+        else:
+            # Legacy format: synthetic was a boolean column
+            for col in (SYNTHETIC_TAG, "synthetic"):
+                if col in df.columns:
+                    df = df[~df[col].fillna(value=False)]
 
         return df
+
+    async def get_dataframe_by_tag(self, model_id: str, tag: str) -> pd.DataFrame:
+        """Get a dataframe filtered to rows matching a specific tag.
+
+        Args:
+            model_id: The model ID
+            tag: The tag value to filter by (e.g. "TRAINING")
+
+        Returns:
+            A pandas DataFrame containing only rows whose tags list includes the tag
+
+        """
+        try:
+            model_data = ModelData(model_id)
+            input_data, output_data, metadata = await model_data.data()
+            input_names, output_names, metadata_names = await model_data.column_names()
+
+            if metadata is None or input_data is None:
+                return pd.DataFrame()
+
+            tags_col = (
+                list(metadata_names).index(TAGS_COLUMN)
+                if TAGS_COLUMN in metadata_names
+                else -1
+            )
+            if tags_col < 0:
+                return pd.DataFrame()
+
+            def _extract_tags(cell: object) -> list:
+                if isinstance(cell, np.ndarray):
+                    return cell.tolist()
+                if isinstance(cell, list):
+                    return cell
+                if isinstance(cell, str):
+                    return [cell]
+                return []
+
+            _legacy_aliases: dict[str, str] = {
+                UNLABELED_TAG: "unlabeled",
+                SYNTHETIC_TAG: "synthetic",
+            }
+            match_tags = {tag}
+            if tag in _legacy_aliases:
+                match_tags.add(_legacy_aliases[tag])
+
+            if len(metadata.shape) == 1:
+                mask = np.array(
+                    [bool(match_tags & set(_extract_tags(cell))) for cell in metadata],
+                    dtype=bool,
+                )
+            else:
+                mask = np.array(
+                    [
+                        bool(match_tags & set(_extract_tags(row[tags_col])))
+                        for row in metadata
+                    ],
+                    dtype=bool,
+                )
+            filtered_input = input_data[mask]
+
+            # Warn on duplicate column names between input and output
+            overlap = set(input_names) & set(output_names)
+            if overlap:
+                logger.warning(
+                    "Column name collision between input/output: %s", overlap
+                )
+
+            df_data: dict[str, object] = {}
+            for i, col_name in enumerate(input_names):
+                if (
+                    len(filtered_input.shape) == ARRAY_DIM_2D
+                    and i < filtered_input.shape[1]
+                ):
+                    df_data[col_name] = filtered_input[:, i]
+                elif len(filtered_input.shape) == 1 and i == 0:
+                    df_data[col_name] = filtered_input
+
+            if output_data is not None:
+                filtered_output = output_data[mask]
+                for i, col_name in enumerate(output_names):
+                    if (
+                        len(filtered_output.shape) == ARRAY_DIM_2D
+                        and i < filtered_output.shape[1]
+                    ):
+                        df_data[col_name] = filtered_output[:, i]
+                    elif len(filtered_output.shape) == 1 and i == 0:
+                        df_data[col_name] = filtered_output
+
+            return pd.DataFrame(df_data)
+
+        except Exception as e:  # Broad catch intentional: dataframe creation involves dynamic storage operations
+            logger.exception(
+                "Error creating dataframe by tag for model=%s, tag=%s",
+                model_id,
+                tag,
+            )
+            msg = "Error creating dataframe by tag. Check server logs for details."
+            raise DataframeCreateError(msg) from e
 
     # METADATA READS
 
@@ -198,15 +337,20 @@ class DataSource:
             input_rows, output_rows, metadata_rows = await model_data.row_counts()
             input_names, output_names, metadata_names = await model_data.column_names()
 
+            input_dataset = model_id + INPUT_SUFFIX
+            input_types = await self.storage_interface.get_column_types(input_dataset)
             input_items = {}
             for i, name in enumerate(input_names):
-                # Default to STRING type - in a real implementation this would be determined from the data
-                input_items[name] = SchemaItem(DataType.STRING, name, i)
+                dtype = _safe_datatype(input_types, i)
+                input_items[name] = SchemaItem(dtype, name, i)
             input_schema = Schema(input_items)
 
+            output_dataset = model_id + OUTPUT_SUFFIX
+            output_types = await self.storage_interface.get_column_types(output_dataset)
             output_items = {}
             for i, name in enumerate(output_names):
-                output_items[name] = SchemaItem(DataType.STRING, name, i)
+                dtype = _safe_datatype(output_types, i)
+                output_items[name] = SchemaItem(dtype, name, i)
             output_schema = Schema(output_items)
 
             metadata = StorageMetadata(
