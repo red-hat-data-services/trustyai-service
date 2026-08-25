@@ -8,8 +8,8 @@ COPY pyproject.toml README.md ./
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0.dev0"
 
-RUN mkdir -p src && \
-    pip install --no-cache-dir ".[mariadb,eval]"
+RUN mkdir -p src/trustyai_service && \
+    pip install --no-cache-dir ".[mariadb,mmd]"
 
 FROM ${CPU_BASE_IMAGE}
 
@@ -34,7 +34,7 @@ ENV PYTHONUNBUFFERED=1 \
 USER 1001
 EXPOSE 8080 4443
 
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "trustyai_service.main"]
 
 LABEL name="rhoai/odh-trustyai-service-py-rhel9" \
       com.redhat.component="odh-trustyai-service-py-rhel9" \

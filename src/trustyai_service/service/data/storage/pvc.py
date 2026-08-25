@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -44,6 +45,7 @@ from .storage_interface import StorageInterface
 logger = logging.getLogger(__name__)
 COLUMN_NAMES_ATTRIBUTE = "column_names"
 COLUMN_ALIAS_ATTRIBUTE = "column_aliases"
+COLUMN_TYPES_ATTRIBUTE = "column_types"
 BYTES_ATTRIBUTE = "is_bytes"
 
 PARTIAL_INPUT_NAME = PROTECTED_DATASET_SUFFIX + PARTIAL_PAYLOAD_DATASET_NAME + "_inputs"
@@ -119,9 +121,31 @@ class PVCStorage(StorageInterface):
         self.global_lock = asyncio.Lock()
 
     def _get_filename(self, dataset_name: str) -> str:
-        """Get the H5PY filename of a particular dataset."""
+        """Get the H5PY filename of a particular dataset.
+
+        Uses path normalization to prevent directory traversal attacks (CWE-22).
+        Validates dataset_name before path construction to satisfy static analysis.
+        """
         if self.one_file_per_dataset:
-            return str(Path(self.data_directory) / f"{dataset_name}_{self.data_file}")
+            # Validate dataset name BEFORE path construction (CWE-22)
+            if ".." in dataset_name or "/" in dataset_name or "\\" in dataset_name:
+                msg = f"Invalid dataset name contains path separators: {dataset_name}"
+                raise ValueError(msg)
+
+            # Construct path as string, then normalize (CodeQL-recognized pattern)
+            # Must use os.path instead of Path for CodeQL to recognize sanitization
+            constructed_path_str = os.path.join(  # noqa: PTH118
+                self.data_directory, f"{dataset_name}_{self.data_file}"
+            )
+            normalized_path_str = os.path.realpath(constructed_path_str)
+            base_path_str = os.path.realpath(self.data_directory)
+
+            # Defense in depth: verify normalized path is within base directory
+            if not normalized_path_str.startswith(base_path_str + os.sep):
+                msg = f"Path traversal attempt detected: {dataset_name}"
+                raise ValueError(msg)
+
+            return normalized_path_str
         return self.data_path
 
     def get_lock(self, dataset_name: str) -> asyncio.Lock:
@@ -133,7 +157,17 @@ class PVCStorage(StorageInterface):
 
     @staticmethod
     def allocate_valid_dataset_name(dataset_name: str) -> str:
-        """Allocate a valid dataset name that does not conflict with internal names."""
+        """Allocate a valid dataset name that does not conflict with internal names.
+
+        Raises:
+            ValueError: If dataset_name contains path traversal characters.
+
+        """
+        # Reject path traversal attempts (CWE-22)
+        if ".." in dataset_name or "/" in dataset_name or "\\" in dataset_name:
+            msg = f"Dataset name contains invalid path characters: {dataset_name}"
+            raise ValueError(msg)
+
         if dataset_name.startswith(PROTECTED_DATASET_SUFFIX):
             return dataset_name.replace(PROTECTED_DATASET_SUFFIX, "inference_")
         return dataset_name
@@ -441,6 +475,43 @@ class PVCStorage(StorageInterface):
                         "but dataset was not found in the database.",
                         allocated_dataset_name,
                     )
+
+    async def set_column_types(
+        self, dataset_name: str, column_types: list[str]
+    ) -> None:
+        """Store column types as an HDF5 attribute."""
+        allocated_dataset_name = self.allocate_valid_dataset_name(dataset_name)
+        async with self.get_lock(allocated_dataset_name):
+            try:
+                # Use allocated name to ensure protected datasets open correct file
+                with H5PYContext(self, allocated_dataset_name, "a") as db:
+                    if allocated_dataset_name in db:
+                        dataset = db[allocated_dataset_name]
+                        if COLUMN_TYPES_ATTRIBUTE not in dataset.attrs:
+                            dataset.attrs[COLUMN_TYPES_ATTRIBUTE] = column_types
+            except MissingH5PYDataError:
+                pass
+
+    async def get_column_types(self, dataset_name: str) -> list[str] | None:
+        """Read column types from HDF5 attribute. Returns None for old data."""
+        allocated_dataset_name = self.allocate_valid_dataset_name(dataset_name)
+
+        # Return early if file doesn't exist to avoid creating it
+        filename = self._get_filename(allocated_dataset_name)
+        if not os.path.exists(filename):
+            return None
+
+        async with self.get_lock(allocated_dataset_name):
+            try:
+                # Use allocated name to ensure protected datasets open correct file
+                with H5PYContext(self, allocated_dataset_name, "r") as db:
+                    if allocated_dataset_name in db:
+                        dataset = db[allocated_dataset_name]
+                        if COLUMN_TYPES_ATTRIBUTE in dataset.attrs:
+                            return list(dataset.attrs[COLUMN_TYPES_ATTRIBUTE])
+            except MissingH5PYDataError:
+                pass
+            return None
 
     async def get_known_models(self) -> list[str]:
         """Get a list of all model IDs that have inference data stored."""

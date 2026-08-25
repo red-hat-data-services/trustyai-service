@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from trustyai_service.endpoints import routes
 from trustyai_service.middleware.gzip_middleware import GzipRequestMiddleware
 
 # Test constants for call counts
@@ -24,7 +25,7 @@ class TestGzipMiddlewareUnit:
 
     def make_scope(
         self,
-        path: str = "/data/upload",
+        path: str = routes.DATA_UPLOAD,
         headers: list[tuple[bytes, bytes]] | None = None,
     ) -> dict[str, Any]:
         """Create mock ASGI scope."""
@@ -174,6 +175,8 @@ class TestGzipMiddlewareUnit:
         assert send.call_count == EXPECTED_SEND_CALLS_ERROR
         start_call = send.call_args_list[0][0][0]
         assert start_call["status"] == HTTPStatus.BAD_REQUEST
+        body_call = send.call_args_list[1][0][0]
+        assert body_call["body"] == b"Request interrupted"
 
     @pytest.mark.asyncio
     async def test_unexpected_error_during_body_read(self) -> None:
@@ -201,6 +204,8 @@ class TestGzipMiddlewareUnit:
         assert send.call_count == EXPECTED_SEND_CALLS_ERROR
         start_call = send.call_args_list[0][0][0]
         assert start_call["status"] == HTTPStatus.INTERNAL_SERVER_ERROR
+        body_call = send.call_args_list[1][0][0]
+        assert body_call["body"] == b"Failed to read request body"
 
     @pytest.mark.asyncio
     async def test_unexpected_error_passthrough_when_fail_on_error_false(self) -> None:
@@ -265,29 +270,66 @@ class TestGzipMiddlewareUnit:
         assert send.call_count == EXPECTED_SEND_CALLS_ERROR
         start_call = send.call_args_list[0][0][0]
         assert start_call["status"] == HTTPStatus.INTERNAL_SERVER_ERROR
+        body_call = send.call_args_list[1][0][0]
+        assert body_call["body"] == b"Internal Server Error"
 
     # === Path Matching Tests ===
 
     def test_should_process_path(self) -> None:
         """Path matching with exact, wildcard, and multiple patterns."""
         # Exact match
-        m1 = GzipRequestMiddleware(None, paths=["/data/upload"])  # type: ignore[arg-type]
-        assert m1.should_process_path("/data/upload")
+        m1 = GzipRequestMiddleware(None, paths=[routes.DATA_UPLOAD])  # type: ignore[arg-type]
+        assert m1.should_process_path(routes.DATA_UPLOAD)
         assert not m1.should_process_path("/data/upload/sub")
         assert not m1.should_process_path("/other")
 
         # Wildcards
         m2 = GzipRequestMiddleware(None, paths=["/data/*", "/api/v*/upload"])  # type: ignore[arg-type]
-        assert m2.should_process_path("/data/upload")
+        assert m2.should_process_path(routes.DATA_UPLOAD)
         assert m2.should_process_path("/data/upload/subpath")
         assert m2.should_process_path("/api/v1/upload")
         assert not m2.should_process_path("/other/path")
 
         # Multiple patterns
-        m3 = GzipRequestMiddleware(None, paths=["/data/upload", "/consumer/data"])  # type: ignore[arg-type]
-        assert m3.should_process_path("/data/upload")
+        m3 = GzipRequestMiddleware(None, paths=[routes.DATA_UPLOAD, "/consumer/data"])  # type: ignore[arg-type]
+        assert m3.should_process_path(routes.DATA_UPLOAD)
         assert m3.should_process_path("/consumer/data")
         assert not m3.should_process_path("/other")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "path",
+        [routes.DATA_UPLOAD, routes.CONSUMER_KSERVE_V2, "/"],
+        ids=["data-upload", "kserve-consumer", "cloud-event"],
+    )
+    async def test_default_middleware_decompresses_all_inbound_routes(
+        self,
+        path: str,
+    ) -> None:
+        """Default middleware decompresses gzip on all inbound data routes."""
+        app = AsyncMock()
+        middleware = GzipRequestMiddleware(app)
+
+        data = b'{"test": "data"}'
+        compressed = gzip.compress(data)
+
+        scope = self.make_scope(
+            path=path,
+            headers=[
+                (b"content-encoding", b"gzip"),
+                (b"content-type", b"application/json"),
+            ],
+        )
+        receive = self.make_receive_with_body(compressed)
+        send = AsyncMock()
+
+        await middleware(scope, receive, send)
+
+        app.assert_called_once()
+        receive_arg = app.call_args[0][1]
+        msg = await receive_arg()
+        assert msg["body"] == data
+        assert msg["more_body"] is False
 
     # === Content-Type Matching Tests ===
 
@@ -365,7 +407,7 @@ class TestGzipMiddlewareUnit:
         middleware = GzipRequestMiddleware(None)  # type: ignore[arg-type]
         invalid = b"not gzip data"
 
-        with pytest.raises(gzip.BadGzipFile):
+        with pytest.raises(gzip.BadGzipFile, match="Not a gzipped file"):
             middleware._decompress_body([invalid], max_size=1024)
 
     # === Metrics Tests ===
@@ -679,7 +721,7 @@ class TestGzipMiddlewareUnit:
         """Initialization defaults and list-to-tuple conversion."""
         # Default values
         m1 = GzipRequestMiddleware(None)  # type: ignore[arg-type]
-        assert m1.paths == ("/data/upload",)
+        assert m1.paths == ("*",)
         assert m1.max_size == 16 * 1024 * 1024
         assert m1.fail_on_error is True
         assert m1.enable_metrics is True
@@ -689,7 +731,7 @@ class TestGzipMiddlewareUnit:
         # Lists converted to tuples for immutability
         m2 = GzipRequestMiddleware(
             None,  # type: ignore[arg-type]
-            paths=["/data/upload"],
+            paths=[routes.DATA_UPLOAD],
             allowed_content_types=["application/json"],
         )
         assert isinstance(m2.paths, tuple)
