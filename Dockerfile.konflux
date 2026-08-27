@@ -24,8 +24,9 @@ COPY src src
 COPY pyproject.toml README.md ./
 
 ARG VERSION="0.0.0.dev0"
-RUN printf '__version__ = version = "%s"\n' "${VERSION}" > src/_version.py && \
-    chown 1001:0 src/_version.py
+ENV SETUPTOOLS_SCM_PRETEND_VERSION="${VERSION}"
+
+RUN pip install --no-cache-dir --no-deps .
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
