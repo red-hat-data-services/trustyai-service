@@ -11,26 +11,22 @@ dependencies = [
     "numpy>=2.0,<3",
     "pandas>=3.0,<4",
     "polars>=1.2,<2",
-    "fastapi>=0.116,<0.140",
-    "fastapi-utils>=0.8,<0.9",
-    "uvicorn>=0.38,<1",
-    "typing-inspect>=0.9,<1",
-    "prometheus-client>=0.22,<0.26",
+    "fastapi>=0.116,<0.142",
+    "prometheus-client>=0.22,<0.27",
     "pydantic>=2.13,<3",
     "hypercorn>=0.18,<0.19",
     "protobuf>=7,<8",        # Security: Resolves CVE-2026-0994 (HIGH - Buffer overflow)
-    "cryptography>=48.0.1,<50",  # Security: Resolves CVE-2026-26007 (HIGH)
     "h5py>=3.13,<4",
     "isodate>=0.7,<0.8",
 ]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.10",
+    "ruff>=0.15.10,<0.17",
     "pyrefly>=0.61",
     "bandit[toml]>=1.9.4",
     "bandit-sarif-formatter>=1.1.1",
-    "httpx>=0.28.1",
+    "httpx2>=2.0",
 ]
 types = [
     "pandas-stubs>=2.3.3",
@@ -45,22 +41,12 @@ test = [
     "pytest-xdist[psutil]>=3.8.0",
     "hypothesis>=6.151.12",
     "aif360>=0.6.1",
-    "pillow>=12.3.0",        # Security: Resolves CVE-2026-25990 (HIGH - Out-of-bounds write)
-]
-notebook = [
-    "ipykernel>=7.2.0",
-    "ipywidgets>=8.1.8",
-    "tornado>=6.5.7",        # Security: Resolves CVE-2026-31958 (HIGH - DoS via malformed headers) and 1 MEDIUM
 ]
 
 [project.optional-dependencies]
-eval = [
-    "lm-eval[api]>=0.4,<0.5",
-    "nltk>=3.10.0,<4",        # Security: Resolves CVE-2025-14009 (CRITICAL - Zip Slip), CVE-2026-33236, CVE-2026-33231 (HIGH), and 2 MEDIUM
-    "sqlitedict>=2.1,<3",    # Security: Resolves CVE-2024-35515 (HIGH)
-]
 # Note: grpcio/grpcio-tools removed - incompatible with protobuf v7, unused (protoc used instead)
-mariadb = ["mariadb>=1.1,<1.2", "javaobj-py3>=0.5,<0.6"]
+mariadb = ["mariadb>=1.1,<1.2", "javaobj-py3>=0.5,<0.7"]
+mmd = ["goodpoints>=0.6.3,<0.7"]
 
 [tool.hatch.version]
 source = "vcs"
@@ -90,21 +76,27 @@ exclude = ["src/trustyai_service/proto/grpc_predict_v2_pb2.py", "src/trustyai_se
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D203",   # one-blank-line-before-class (conflicts with D211)
-    "D213",   # multi-line-summary-second-line (conflicts with D212)
-    "E501",   # line-too-long (handled by formatter)
-    "COM812", # trailing commas (conflicts with formatter)
+    "CPY001",  # missing-copyright-notice (no copyright headers in this project)
+    "D203",    # one-blank-line-before-class (conflicts with D211)
+    "D213",    # multi-line-summary-second-line (conflicts with D212)
+    "E501",    # line-too-long (handled by formatter)
+    "COM812",  # trailing commas (conflicts with formatter)
+    "PLR0917", # too-many-positional-params (covered by per-file PLR0913 ignores)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # === SRC FILES ===
+"src/trustyai_service/core/metrics/drift/greenwald_khanna_quantile_sketch.py" = ["RUF001", "RUF002", "RUF003"]
 "src/trustyai_service/core/metrics/drift/jensen_shannon.py" = ["PLR0913"]
+"src/trustyai_service/core/metrics/drift/kolmogorov_smirnov_streaming.py" = ["RUF001", "RUF002", "RUF003"]
+"src/trustyai_service/core/metrics/drift/mmd.py" = ["C901"]
 "src/trustyai_service/core/metrics/fairness/group/*.py" = ["PLR0913"]
 "src/trustyai_service/middleware/gzip_middleware.py" = ["C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
 "src/trustyai_service/service/data/datasources/data_source.py" = ["BLE001", "C901", "PLR0912"]
 "src/trustyai_service/service/data/modelmesh_parser.py" = ["PLR0913"]
 "src/trustyai_service/service/data/storage/**/*.py" = ["SLF001", "BLE001", "PLR0913"]
 "src/trustyai_service/service/data/storage/pvc.py" = ["C901", "PLR0912", "PLR0915", "ASYNC240", "PTH110"]
+"src/trustyai_service/service/data/storage/maria/maria.py" = ["ASYNC240"]  # One-time startup PVC check via Path.exists/is_dir/glob (local mount, negligible blocking)
 "src/trustyai_service/service/payloads/**/*.py" = ["SLF001"]
 "src/trustyai_service/service/payloads/metrics/request_reconciler.py" = ["C901", "PLR0912", "PLR0915"]
 "src/trustyai_service/service/prometheus/prometheus_publisher.py" = ["SLF001"]
@@ -112,21 +104,29 @@ ignore = [
 "src/trustyai_service/endpoints/consumer/*.py" = ["N815"]
 "src/trustyai_service/endpoints/consumer/__init__.py" = ["C901"]
 "src/trustyai_service/endpoints/consumer/consumer_endpoint.py" = ["BLE001", "C901", "PLR0912", "PLR0913", "PLR0915"]
-"src/trustyai_service/endpoints/evaluation/lm_evaluation_harness.py" = ["SLF001"]
 "src/trustyai_service/endpoints/explainers/*.py" = ["N815"]
 "src/trustyai_service/endpoints/metadata.py" = ["N815", "BLE001", "C901"]
 "src/trustyai_service/endpoints/metrics/**/*.py" = ["N815"]
 "src/trustyai_service/endpoints/metrics/fairness/group/*.py" = ["BLE001", "TRY300", "TRY301"]
 "src/trustyai_service/endpoints/metrics/drift/jensen_shannon.py" = ["TRY300", "TRY301"]
 "src/trustyai_service/endpoints/metrics/drift/compare_means.py" = ["C901", "TRY301"]
+"src/trustyai_service/service/health_checks.py" = ["TRY301"]
+"src/trustyai_service/endpoints/metrics/drift/kolmogorov_smirnov_streaming.py" = ["RUF001", "RUF002", "RUF003", "TRY301"]
+"src/trustyai_service/service/config/registry.py" = ["PLR0913"]
 # === TEST FILES ===
 "tests/**" = ["S101", "PT019", "SLF001"]
+"tests/service/test_health_checks.py" = ["S106", "ANN001", "PLR2004", "FBT003"]
+"tests/service/config/*.py" = ["D102"]
 "tests/core/metrics/test_fairness.py" = ["N803", "N806"]
+"tests/core/metrics/drift/test_greenwald_khanna_quantile_sketch.py" = ["PLR2004", "RUF001", "RUF002", "RUF003"]
 "tests/endpoints/metrics/drift/factory.py" = ["PLR0913", "C901", "PLR0915"]
+"tests/endpoints/metrics/fairness/group/factory.py" = ["PLR0913", "PLC0415"]
 "tests/endpoints/test_upload_endpoint_maria.py" = ["S105"]
 "tests/endpoints/test_upload_endpoint_pvc.py" = ["PLR0913"]
 "tests/service/data/test_utils.py" = ["PLR0913", "UP037"]  # UP037: Keep quoted annotations for optional protobuf imports
 "tests/service/serialization/test_rows.py" = ["PLR2004"]
+"tests/service/data/storage/test_pvc_storage.py" = ["PLC0415", "PLR2004"]
+"tests/service/data/storage/maria/*.py" = ["ANN", "PLR2004", "ARG002"]  # Pytest style: no test method annotations, exact assertion values, setup-only fixtures
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
@@ -143,7 +143,7 @@ skips = [
 
 [tool.pyrefly]
 search-path = ["."]
-project-excludes = ["**/proto/**", "src/trustyai_service/proto/**", "src/trustyai_service/proto/grpc_predict_v2_pb2.py", "src/trustyai_service/_version.py"]
+project-excludes = [".claude/**", "**/proto/**", "src/trustyai_service/proto/**", "src/trustyai_service/proto/grpc_predict_v2_pb2.py", "src/trustyai_service/_version.py"]
 disable-project-excludes-heuristics = true
 # Forward-looking: pyrefly uses this for type checking, not runtime
 python-version = "3.14.0"
@@ -154,7 +154,6 @@ ignore-missing-imports = [
     "hypercorn.*",
     "isodate.*",
     "javaobj.*",
-    "lm_eval.*",
     "mariadb.*",
     "prometheus_client.*",
     "starlette.*",
@@ -212,14 +211,6 @@ matches = "src/trustyai_service/core/metrics/fairness/**"
 [tool.pyrefly.sub-config.errors]
 missing-attribute = "ignore"
 
-# Suppress scipy API issues in notebooks
-[[tool.pyrefly.sub-config]]
-matches = "**/*.ipynb"
-
-[tool.pyrefly.sub-config.errors]
-unexpected-keyword = "ignore"
-no-matching-overload = "ignore"
-
 # Suppress intentional private attribute access in test files
 [[tool.pyrefly.sub-config]]
 matches = "tests/service/payloads/metrics/test_request_reconciler.py"
@@ -276,70 +267,3 @@ not-iterable = "ignore"
 invalid-annotation = "ignore"
 bad-argument-type = "ignore"
 bad-param-name-override = "ignore"
-
-# Suppress evaluation harness dynamic model issues
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/endpoints/evaluation/lm_evaluation_harness.py"
-
-[tool.pyrefly.sub-config.errors]
-no-matching-overload = "ignore"
-unbound-name = "ignore"
-missing-attribute = "ignore"
-
-# Suppress consumer endpoint union type validation issues
-# Runtime validation narrows union types before calling functions
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/endpoints/consumer/consumer_endpoint.py"
-
-[tool.pyrefly.sub-config.errors]
-bad-argument-type = "ignore"
-
-# Suppress test process/subprocess attribute access
-[[tool.pyrefly.sub-config]]
-matches = "tests/**/*.py"
-
-[tool.pyrefly.sub-config.errors]
-missing-attribute = "ignore"
-
-# Suppress subprocess and config dict issues in main
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/main.py"
-
-[tool.pyrefly.sub-config.errors]
-missing-attribute = "ignore"
-unsupported-operation = "ignore"
-
-# Suppress metadata endpoint config issues
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/endpoints/metadata.py"
-
-[tool.pyrefly.sub-config.errors]
-unsupported-operation = "ignore"
-
-# Suppress model data tuple return type issues
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/service/data/model_data.py"
-
-[tool.pyrefly.sub-config.errors]
-bad-return = "ignore"
-
-# Suppress legacy maria reader pandas Index issues
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/service/data/storage/maria/legacy_maria_reader.py"
-
-[tool.pyrefly.sub-config.errors]
-bad-argument-type = "ignore"
-
-# Suppress storage init int conversion issues
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/service/data/storage/__init__.py"
-
-[tool.pyrefly.sub-config.errors]
-bad-argument-type = "ignore"
-
-# Suppress typed value optional return types
-[[tool.pyrefly.sub-config]]
-matches = "src/trustyai_service/service/payloads/values/typed_value.py"
-
-[tool.pyrefly.sub-config.errors]
-bad-return = "ignore"
