@@ -57,7 +57,8 @@ trove-classifiers==2026.6.1.19 \
     --hash=sha256:af674cc313d3fb0d5a377850befd49ccbf57124d173a39895ba6f3bf2835594b
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-vcs-versioning==2.2.4 \
-    --hash=sha256:8a116011301496239243fe324dd8cbaa4b303c57bb18ee7470d833ed784dc45c
+vcs-versioning==2.3.1 \
+    --hash=sha256:806635bd0ea653c96af98a70624be758d408a989f2cd0b390e63474d99f96b63 \
+    --hash=sha256:a11299394e101569a62ab061375260d08bc56cd33d685b7067d85312368f4457
     # via setuptools-scm
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
