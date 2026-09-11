@@ -64,7 +64,7 @@ prometheus-client==0.25.0
     # via trustyai-service (pyproject.toml)
 protobuf==7.35.1
     # via trustyai-service (pyproject.toml)
-psutil==5.9.8
+psutil==7.2.2
     # via fastapi-utils
 pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
