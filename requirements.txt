@@ -12,7 +12,7 @@ click==8.4.2
     # via uvicorn
 cryptography==49.0.0
     # via trustyai-service (pyproject.toml)
-fastapi==0.137.2
+fastapi==0.139.0
     # via
     #   trustyai-service (pyproject.toml)
     #   fastapi-utils
