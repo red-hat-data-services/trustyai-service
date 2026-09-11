@@ -101,7 +101,7 @@ jobs:
           body-includes: PR image build and manifest generation completed successfully
 
       - name: Post success comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         env:
           IMAGE: quay.io/trustyai/trustyai-service-python-ci
           TAG: ${{ steps.meta.outputs.pr-sha }}
