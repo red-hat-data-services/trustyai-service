@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=quay.io/opendatahub/odh-midstream-python-base-3-12:1.20260731.1
+ARG BASE_IMAGE=quay.io/opendatahub/odh-midstream-python-base-3-12:1.20260911.0
 
 FROM ${BASE_IMAGE}
 
