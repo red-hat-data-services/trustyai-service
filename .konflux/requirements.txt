@@ -116,8 +116,9 @@ priority==2.0.0 \
     --hash=sha256:2cc4eac6f3168fe475233b80ac81139656a954df05238a360abf7d0ef283302a
     # via hypercorn
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-prometheus-client==0.25.0 \
-    --hash=sha256:eae4142f4cb8dfdc0f532e0682b5327ad3cc648b8df0dee315cc2ac5bd025ebf
+prometheus-client==0.26.0 \
+    --hash=sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b \
+    --hash=sha256:fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 protobuf==7.35.1 \
