@@ -77,8 +77,9 @@ mariadb==1.1.14 \
     --hash=sha256:f68d64212260824b3aeb5a64924ead927925606342bc958ada26d6efd7ccf906
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-narwhals==2.24.0 \
-    --hash=sha256:f54f51ae0f3f16558d4928d6614bb8733bc3cabf519fbd66199dde787a12a94f
+narwhals==2.25.0 \
+    --hash=sha256:1f0f403e8c7e4463cde9bfe78b12fdd809e3ae3dda6d9b2f802934fb9c7a6a8f \
+    --hash=sha256:62c036c810662bf7820b7737077176313bc59350eeeefb808510f388c743e4b2
     # via scikit-learn
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 numpy==2.5.2 \
