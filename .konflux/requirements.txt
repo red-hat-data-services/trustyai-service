@@ -120,11 +120,15 @@ prometheus-client==0.25.0 \
     --hash=sha256:eae4142f4cb8dfdc0f532e0682b5327ad3cc648b8df0dee315cc2ac5bd025ebf
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-protobuf==7.35.1 \
-    --hash=sha256:63a2a260a70c319de577df0b79ab2cb0f0d23178013256b316ad5f11da9282f6 \
-    --hash=sha256:c1276985b90d2fd12dce2ac8a2de8d29c4aeb55cbce9af178e2b10f2548d0085 \
-    --hash=sha256:dd0781297c607b85f9bf1aaf8f0c1849fab19585c8dd39667a62298ceee99fd7 \
-    --hash=sha256:eeead6967ce91ee614f198376b69709da4771372cd44a4afa63c2e84f47bf399
+protobuf==7.36.0 \
+    --hash=sha256:1781cc1de61249b750848029bca452c0a8b7e990080316b9bbc2518b2117b488 \
+    --hash=sha256:3297e60abdff301e5f74393d87f6cc59dacab5f024a89548a6e8de1d26576b16 \
+    --hash=sha256:53374d53fc29a67f7dbbf0ade47d7526a0f0137bf0f9c90e48d8a60790ef748c \
+    --hash=sha256:70f5ec8eb0da81a44360c0dc0beac99a0d78071d21956a7076bae8bd2051841b \
+    --hash=sha256:7326fd717bdc419162a735938d89d4032332bcc3408804012b24ff3a37086071 \
+    --hash=sha256:9103532dffd80c6fab7e50c65a31007680a06eb57537d437bb1b35812c138a37 \
+    --hash=sha256:bf94a5917c71058262de683669bc0a797a7669d3de71f0b36d058e3194f47b44 \
+    --hash=sha256:e8e09cb0d794c6687926fa558a8a6e72aa10edb997d5ca61da0765f12a3e00ea
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 pydantic==2.13.4 \
