@@ -158,8 +158,8 @@ trove-classifiers==2026.6.1.19 \
     --hash=sha256:c5132b4b61a829d11cfbd2d72e97f20a45ed6edb95e45c5efdeb5e00836b2745
     # via hatchling
     # from https://pypi.org/simple
-vcs-versioning==2.2.4 \
-    --hash=sha256:48ffea8a6a175c37a718c7ee2e5f508d0e500c2cf3371791f7948bccb2b44628 \
-    --hash=sha256:ed718fdee42170e128a8add6f23f53aa64dc7d9ab2de87d3083a691df881a809
+vcs-versioning==2.6.0 \
+    --hash=sha256:22e9159288e2d8bca2fa6f6c31c34c9c66aec157f60e9e526f5d160d2516d60f \
+    --hash=sha256:f8bebd1302ebc12e67ceb30fc7dd698ec969414b6fa43b30c3f14ac9b1e72c41
     # via setuptools-scm
     # from https://pypi.org/simple
