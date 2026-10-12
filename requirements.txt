@@ -16,9 +16,9 @@ anyio==4.14.2 \
     --hash=sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f
     # via starlette
     # from https://pypi.org/simple
-fastapi==0.139.2 \
-    --hash=sha256:333145a6891e9b5b3cfceb69baf817e8240cde4d4588ae5a10bf56ffacb6255e \
-    --hash=sha256:b9ad015a835173d59865e2f5d8296fbc2b317bf56a2ba1a5bfbdd03de2fd4b1c
+fastapi==0.143.0 \
+    --hash=sha256:1acffe48206a80917cf7dac21992b5c44b25384e8902bf745c1fd9dabcf6c51f \
+    --hash=sha256:3e9395fd35276425b61b516a31fdd7c77fe2af83e41b4da22e30696fb1304c5d
     # via trustyai-service (pyproject.toml)
     # from https://pypi.org/simple
 goodpoints==0.6.3 \
