@@ -116,8 +116,9 @@ priority==2.0.0 \
     --hash=sha256:0430d651c6984ad3ab61e6db5bacc12835b1cd2090bfdbfc996ff02db91866a8
     # via hypercorn
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-prometheus-client==0.25.0 \
-    --hash=sha256:c45ee70f66e5c5232d4eb529480c727b2860666b6f256cddacbbefe01650b88e
+prometheus-client==0.26.0 \
+    --hash=sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b \
+    --hash=sha256:fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 protobuf==7.35.1 \
