@@ -54,8 +54,9 @@ hyperframe==6.1.0 \
     --hash=sha256:ffc17cba64f162b035994fb9bd30e0dd5989d04432fbcb0391c83f9f15741f6f
     # via h2
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-idna==3.18 \
-    --hash=sha256:ef9f0cfcb9f97cefb8032de04a8f49ce8674a16585f4df1fe12ce22918c57694
+idna==3.20 \
+    --hash=sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44 \
+    --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
     # via anyio
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 isodate==0.7.2 \
