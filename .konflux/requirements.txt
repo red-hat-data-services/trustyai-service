@@ -164,8 +164,9 @@ six==1.17.0 \
     --hash=sha256:d0fea194c3813bd785de9ec350864656a5566f5be278f314794963f831649051
     # via python-dateutil
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-starlette==1.6.0 \
-    --hash=sha256:1e52f9e8ebb9f3555749acd358a34965a47e03f8ad3b6448c428a42167929509
+starlette==1.7.0 \
+    --hash=sha256:67f8e99895493dd2911a03f11314af6ceebeae4e704bb9f43dfc6a9db151c93e \
+    --hash=sha256:c79f74ea63cff761804fbbfb182f1e0b440c2d07b164d24700c5a1bab5d6ff5d
     # via fastapi
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 threadpoolctl==3.6.0 \
