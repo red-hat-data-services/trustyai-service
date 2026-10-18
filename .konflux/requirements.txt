@@ -62,8 +62,9 @@ isodate==0.7.2 \
     --hash=sha256:cf2450005fd7e00178a83a9e4cceef344af8b37be217ed42f3e413aa04f6f957
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-javaobj-py3==0.5.0 \
-    --hash=sha256:6cee5eebf5bfdf1f2668732d72d7bffc8dcc2c1b908bc841590b2db2efb49c61
+javaobj-py3==0.6.1 \
+    --hash=sha256:088ff086c6aa2912f342754c43b0ca3a504fb869bb5e6f13395131e87744ef3c \
+    --hash=sha256:da97c61cb050bad37cca00523b1a617cc26ed2b698b6322cbc118820a4f52b30
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
 joblib==1.5.3 \
