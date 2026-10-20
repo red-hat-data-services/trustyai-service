@@ -45,8 +45,9 @@ setuptools==84.0.0 \
     --hash=sha256:54551c2da1e47baf2c91b9c2ff07d616ae51cbc1c6c65e5f73103a826824c954
     # via setuptools-scm
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-setuptools-scm==10.2.1 \
-    --hash=sha256:a12c65e4041252231a30c0bf7fce9d45d1a330ac3d9acff958126f315d1a5dcb
+setuptools-scm==10.3.4 \
+    --hash=sha256:82f34c3e3084fc2b57d397200637cc13f2338004052d2fee47baa5f0e902464e \
+    --hash=sha256:a69f28bfc245608781205e912faae437c2b2165773afa4e7b979d77447a69dd2
     # via hatch-vcs
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 tomlkit==0.15.1 \
