@@ -14,8 +14,9 @@ anyio==4.14.2 \
     --hash=sha256:3ac42ddfe0d1045b2004ded838e40349d4bdb3824d72237f2db5a80fc416e035
     # via starlette
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-fastapi==0.139.2 \
-    --hash=sha256:86d98a95b4bc6eabd040b53c718487244689568c035b90ac31eb66143540364e
+fastapi==0.143.2 \
+    --hash=sha256:da2fe9893b7392ebce76d8c8511e3fa43e5a25f5852103aa2eee7cff3ab80b75 \
+    --hash=sha256:e9e6d97018dcfd748da7d9e7c61cedefbe9eb91b1a3288e45b13fbae76df2d54
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 goodpoints==0.6.3 \
