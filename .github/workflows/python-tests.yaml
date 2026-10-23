@@ -80,7 +80,7 @@ jobs:
     # (SQLite runs in-process, no service needed.)
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: trustyai
           POSTGRES_PASSWORD: trustyai  # pragma: allowlist secret
