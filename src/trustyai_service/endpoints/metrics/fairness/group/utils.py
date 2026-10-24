@@ -1,11 +1,13 @@
 """Utility functions and models for group fairness metric endpoints."""
 
+import json
 import logging
+import math
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from trustyai_service.service.data.datasources.data_source import DataSource
 from trustyai_service.service.data.shared_data_source import get_shared_data_source
@@ -18,6 +20,8 @@ from trustyai_service.service.prometheus.shared_prometheus_scheduler import (
 )
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_BATCH_SIZE = 100
 
 
 class ReconcilableFeature(BaseModel):
@@ -47,7 +51,7 @@ class GroupMetricRequest(BaseMetricRequest):
         default=None, alias="metricName"
     )  # Will be set by endpoint
     request_name: str | None = Field(default=None, alias="requestName")
-    batch_size: int | None = Field(default=100, alias="batchSize")
+    batch_size: int | None = Field(default=DEFAULT_BATCH_SIZE, alias="batchSize", gt=0)
 
     # SPD-specific fields
     protected_attribute: str = Field(alias="protectedAttribute")
@@ -63,12 +67,47 @@ class GroupMetricRequest(BaseMetricRequest):
     )
     threshold_delta: float | None = Field(default=None, alias="thresholdDelta")
 
+    @field_validator(
+        "privileged_attribute", "unprivileged_attribute", "favorable_outcome"
+    )
+    @classmethod
+    def _reject_non_finite_values(
+        cls,
+        value: ReconcilableFeature | ReconcilableOutput | float | str,
+    ) -> ReconcilableFeature | ReconcilableOutput | float | str:
+        """Reject NaN and infinity so label serialization returns a 422, not a 500."""
+        for item in _extract_values(value):
+            if isinstance(item, float) and not math.isfinite(item):
+                msg = "non-finite numeric values are not allowed"
+                raise ValueError(msg)
+        return value
+
     def retrieve_tags(self) -> dict[str, str]:
         """Retrieve tags for this SPD metric request."""
-        tags = self.retrieve_default_tags()
-        tags["protectedAttribute"] = self.protected_attribute
-        tags["outcomeName"] = self.outcome_name
-        return tags
+        return {
+            **self.retrieve_default_tags(),
+            "protectedAttribute": self.protected_attribute,
+            "outcomeName": self.outcome_name,
+            "outcome": self.outcome_name,
+            "favorable_value": _serialize_label_value(self.favorable_outcome),
+            "protected": self.protected_attribute,
+            "privileged": _serialize_label_value(self.privileged_attribute),
+            "unprivileged": _serialize_label_value(self.unprivileged_attribute),
+            "batch_size": str(self.batch_size or DEFAULT_BATCH_SIZE),
+        }
+
+
+def _serialize_label_value(
+    value: ReconcilableFeature | ReconcilableOutput | float | str,
+) -> str:
+    """Serialize label values as compact JSON, including Python wrapper forms."""
+    values = _extract_values(value)
+    return json.dumps(
+        values[0] if len(values) == 1 else values,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
 
 
 class GroupDefinitionRequest(BaseModel):
