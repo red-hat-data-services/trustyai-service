@@ -42,8 +42,9 @@ pluggy==1.6.0 \
     --hash=sha256:16677849f19621201a96485c72a92dcceada6cc8d7dbb9e2f7424b8e8d4cbfe3
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-setuptools==84.0.0 \
-    --hash=sha256:54551c2da1e47baf2c91b9c2ff07d616ae51cbc1c6c65e5f73103a826824c954
+setuptools==84.2.1 \
+    --hash=sha256:3ff8b3b5492a0aa66960f4419365a86b84e013070d4313e4d4a6894f5d64d6bc \
+    --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
     # via
     #   -r .konflux/requirements-build.in
     #   setuptools-scm
