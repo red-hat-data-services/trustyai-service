@@ -1,0 +1,4 @@
+# Konflux-only override for `uv pip compile` (see header of requirements.txt).
+# The `postgres` extra pins psycopg[binary], but the AIPCC index has no psycopg-binary.
+# It ships prebuilt psycopg-c wheels for x86_64/aarch64/ppc64le/s390x; libpq.so.5 comes from the base image.
+psycopg[c]>=3.2,<4
