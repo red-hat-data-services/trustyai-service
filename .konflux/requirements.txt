@@ -66,8 +66,9 @@ javaobj-py3==0.5.0 \
     --hash=sha256:6827c06b9bbadc9c7c0aad303f5314bed3111165bb24337b2a001b58abbcd9ab
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-joblib==1.5.3 \
-    --hash=sha256:dad54821f9e52c36846c3a7cd086024d989bde78c71251543686099f56bccb4e
+joblib==1.6.0 \
+    --hash=sha256:2ccc96785b12046c08fd6d55839c12857831b54a3c1673ffadd2f04bfc4eda03 \
+    --hash=sha256:3dbbf9f6e4b592a2357b854608e980fe6390d131d7a82f011a377ef2ebef7aba
     # via scikit-learn
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 mariadb==1.1.14 \
