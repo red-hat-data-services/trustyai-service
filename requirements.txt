@@ -270,9 +270,9 @@ pandas==3.0.5 \
     --hash=sha256:fa290c16964d4963fbfbc358928239cf3bd755b20e988ce944877def2f44471d
     # via trustyai-service (pyproject.toml)
     # from https://pypi.org/simple
-polars==1.43.2 \
-    --hash=sha256:22aa0cb92a1ee2d60d6a15a638b2e8e0dd99aea21ac0cd8fb29da8e382e075a9 \
-    --hash=sha256:c699671b99eb71ff53334d237917aaa3db5ad4dda480abcb6c80e0eaee7b677b
+polars==2.1.0 \
+    --hash=sha256:63c50ce3533f5a03d17c3a2a24f1d0e0c7eda98fbde4268a3cba900d34060e67 \
+    --hash=sha256:9eee488d6e10773c028753dfc8dac647fd60a708108dcb818a733e85d33df253
     # via trustyai-service (pyproject.toml)
     # from https://pypi.org/simple
 polars-runtime-32==1.43.2 \
