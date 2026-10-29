@@ -133,8 +133,9 @@ psycopg-c==3.3.6 ; implementation_name != 'pypy' \
     --hash=sha256:e7cb6ed70bd1d25e2be9245375d9b8a43bec7e10b84e4d65beec218186a2fcbb
     # via psycopg
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-pydantic==2.13.4 \
-    --hash=sha256:15d23ce28584cb5ed1f16ff32afffd4d77e6e8b64dd795d4542af567f2be1a72
+pydantic==2.14.1 \
+    --hash=sha256:9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454 \
+    --hash=sha256:94f478203dd03404682a1ada216965651dd74b1d2d5ffd62e00e0837caab5c26
     # via
     #   trustyai-service (pyproject.toml)
     #   fastapi
