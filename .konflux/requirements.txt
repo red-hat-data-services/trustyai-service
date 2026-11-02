@@ -127,8 +127,9 @@ protobuf==7.35.1 \
     --hash=sha256:eeead6967ce91ee614f198376b69709da4771372cd44a4afa63c2e84f47bf399
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9/simple/
-pydantic==2.13.4 \
-    --hash=sha256:c2b80c0bf0ccaf5474fd7df4889f8d3771a28135d75849da73df0256457835ee
+pydantic==2.13.5 \
+    --hash=sha256:346a034f080da3755d8e9cb5e00e8b07de1d39e4f6e2c87d8ab7cafa0b269a73 \
+    --hash=sha256:51a9c5f7b2f8e636f04c6cada605d9b6a3bf1348fdf945a3d8869b19bba0ee08
     # via
     #   trustyai-service (pyproject.toml)
     #   fastapi
