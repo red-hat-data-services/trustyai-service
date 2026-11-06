@@ -346,9 +346,9 @@ protobuf==7.36.2 \
     --hash=sha256:e11e1f0180583a2af89db6a2ecd9e8dc40aa6d2988ca175bfd0e6d12ea72d74e \
     --hash=sha256:f4fee11ec330d238b34a05c9b675f693c20415d1c5bd7d5320cc2f8a798eb9cf
     # via trustyai-service
-psycopg==3.3.5 \
-    --hash=sha256:ce5aa5cdb4f9379f00f487590e5890bfa7df9a164648c969ffa628505e21af4e \
-    --hash=sha256:d0a3d9ccf5788af054cbd745278cb02401b5c312aeaafbf2c6144460aec47da4
+psycopg==3.3.7 \
+    --hash=sha256:6574f23fd79bf129ee0616b49f6e358faf7ae1bf3a362d2ad599cf8f9c3d4935 \
+    --hash=sha256:d592e88a077e01ff57f22d59f16e828b92f2b2d9f439b6679d582b48d74cf306
     # via trustyai-service
 psycopg-binary==3.3.5 ; implementation_name != 'pypy' \
     --hash=sha256:0249c3e960cdee686000eb77169fb6590105c05bacc37e057ccdffdcd8e6ebde \
