@@ -4,12 +4,13 @@ FROM ${CPU_BASE_IMAGE} AS builder
 
 USER root
 
-COPY pyproject.toml README.md ./
+COPY .konflux/requirements.txt ./requirements.txt
 
-ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0.dev0"
-
-RUN mkdir -p src/trustyai_service && \
-    pip install --no-cache-dir ".[mariadb,mmd]"
+# Install strictly from the hashed lockfile so the hermetic (prefetched) build never resolves anything.
+# It includes the mariadb, mmd and postgres extras; psycopg-c replaces psycopg[binary] (no such wheel
+# on the AIPCC index) and links against libpq.so.5 from the base image.
+RUN pip install --no-cache-dir --no-deps --require-hashes -r requirements.txt && \
+    python -c "import psycopg; assert psycopg.pq.__impl__ == 'c', psycopg.pq.__impl__"
 
 # uv is build tooling inherited from the base image, not a runtime dependency.
 # Remove its bundled crypto and the uvx companion (RHOAIENG-97373).

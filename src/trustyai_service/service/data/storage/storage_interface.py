@@ -1,6 +1,8 @@
 """Abstract storage interface defining the contract for data persistence backends."""
 
+import asyncio
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 
@@ -37,6 +39,18 @@ class StorageInterface(ABC):
     ) -> None:
         """Write new rows to a dataset."""
 
+    async def write_data_batch(
+        self, datasets: list[tuple[str, np.ndarray, list[str]]]
+    ) -> None:
+        """Write related datasets; transactional backends override this method.
+
+        The default preserves independent writes for file storage. SQL storage
+        validates the complete batch and commits its rows atomically.
+        """
+        await asyncio.gather(
+            *(self.write_data(name, rows, columns) for name, rows, columns in datasets)
+        )
+
     @abstractmethod
     async def read_data(
         self, dataset_name: str, start_row: int | None = None, n_rows: int | None = None
@@ -69,6 +83,11 @@ class StorageInterface(ABC):
 
     async def get_column_types(self, dataset_name: str) -> list[str] | None:
         """Read column type information. Returns None if backend doesn't support it."""
+        _ = dataset_name
+        return None
+
+    async def get_service_metadata(self, dataset_name: str) -> dict[str, Any] | None:
+        """Read optional persisted tensor names and recorded-inference state."""
         _ = dataset_name
         return None
 
