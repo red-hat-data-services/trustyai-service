@@ -62,8 +62,9 @@ isodate==0.7.2 \
     --hash=sha256:ae0f301da334afa249cc3f9a3d06b78d983ab649da195fa33e936115f2cd3830
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-javaobj-py3==0.5.0 \
-    --hash=sha256:6827c06b9bbadc9c7c0aad303f5314bed3111165bb24337b2a001b58abbcd9ab
+javaobj-py3==0.6.1 \
+    --hash=sha256:088ff086c6aa2912f342754c43b0ca3a504fb869bb5e6f13395131e87744ef3c \
+    --hash=sha256:da97c61cb050bad37cca00523b1a617cc26ed2b698b6322cbc118820a4f52b30
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 joblib==1.5.3 \
