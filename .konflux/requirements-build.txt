@@ -60,8 +60,9 @@ trove-classifiers==2026.6.1.19 \
     --hash=sha256:0dcf222286e5c4546fbf54cf83b5a24f8b77ccecfbb07b9c3be56481889f52e7
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-vcs-versioning==2.2.4 \
-    --hash=sha256:dd14a4d52a1e592d7ec28f7bb62421997c595112231badf157bb74b1705a10b4
+vcs-versioning==2.6.0 \
+    --hash=sha256:22e9159288e2d8bca2fa6f6c31c34c9c66aec157f60e9e526f5d160d2516d60f \
+    --hash=sha256:f8bebd1302ebc12e67ceb30fc7dd698ec969414b6fa43b30c3f14ac9b1e72c41
     # via setuptools-scm
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 wheel==0.48.0 \
