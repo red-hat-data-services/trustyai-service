@@ -3,7 +3,7 @@ name = "trustyai-service"
 dynamic = ["version"]
 description = "TrustyAI Service"
 authors = [{ name = "Rui Vieira" }, { name = "TrustyAI team" }]
-requires-python = ">=3.12, <3.15"
+requires-python = ">=3.15, <3.16"
 readme = "README.md"
 dependencies = [
     "scikit-learn>=1.7,<2",
