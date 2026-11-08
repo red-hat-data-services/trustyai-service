@@ -10,8 +10,9 @@ annotated-types==0.8.0 \
     --hash=sha256:20c363a73ef38607a829a6697a8d43dfb355b71bdd2d3f2fe03e0a4f5c53b7be
     # via pydantic
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-anyio==4.14.2 \
-    --hash=sha256:3ac42ddfe0d1045b2004ded838e40349d4bdb3824d72237f2db5a80fc416e035
+anyio==4.16.0 \
+    --hash=sha256:59bb03251907983d1603d27c3087ddb1e93299ea2163adcdba37899a4fb12ffb \
+    --hash=sha256:c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026
     # via starlette
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 fastapi==0.139.2 \
