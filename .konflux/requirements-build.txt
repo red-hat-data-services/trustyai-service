@@ -56,8 +56,9 @@ tomlkit==0.15.1 \
     --hash=sha256:bd43ad0b5790fd1be6cd4d3669eb38a9492eee5745cdb65a6df344dce2485b40
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-trove-classifiers==2026.6.1.19 \
-    --hash=sha256:0dcf222286e5c4546fbf54cf83b5a24f8b77ccecfbb07b9c3be56481889f52e7
+trove-classifiers==2026.9.21.13 \
+    --hash=sha256:0a9ebc8d4e2f3e8a22848c5258033035bec17a3012ac3fea16dbaa764489eb71 \
+    --hash=sha256:8b1ff4f9c191b1040b71c37f1e445ab99732911e3cd91de52838453a854d7a17
     # via hatchling
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 vcs-versioning==2.2.4 \
