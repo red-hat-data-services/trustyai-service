@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>opendatahub-io/renovate-config",
+    "local>opendatahub-io/renovate-config//base-images"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the Konflux CPU base image",
+      "managerFilePatterns": [".konflux/base-images.conf"],
+      "matchStrings": [
+        "CPU_BASE_IMAGE=(?<depName>quay\\.io/aipcc/base-images/[^:\\s@]+):(?<currentValue>[^@\\s]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "autoReplaceStringTemplate": "CPU_BASE_IMAGE={{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Keep the selected CPU base image digest-pinned",
+      "matchDatasources": ["docker"],
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": [
+        "quay.io/aipcc/base-images/cpu-torch2.13-el9.8"
+      ],
+      "pinDigests": true
+    }
+  ]
+}
