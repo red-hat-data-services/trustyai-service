@@ -181,8 +181,9 @@ starlette==1.6.0 \
     --hash=sha256:1e52f9e8ebb9f3555749acd358a34965a47e03f8ad3b6448c428a42167929509
     # via fastapi
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-threadpoolctl==3.6.0 \
-    --hash=sha256:f3bc36f7eebee0ff2f0227735d3f688365ebd3a387148596e8911117fa8f76a9
+threadpoolctl==3.7.0 \
+    --hash=sha256:61348cfb77d53b9242e0017029244b559b810c142ced65b4e21eeca1843959a7 \
+    --hash=sha256:cd8b60b5641b45c67bbf73c64c843235fc2d8a480c87389f52f5dbee893b86be
     # via scikit-learn
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 typing-extensions==4.16.0 \
