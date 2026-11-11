@@ -126,11 +126,8 @@ psycopg==3.3.6 \
     #   --override .konflux/requirements-override.txt
     #   trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-psycopg-c==3.3.6 ; implementation_name != 'pypy' \
-    --hash=sha256:0f31563e1799433816d25497745fbe60345200958e8e13636afdbae1f1e3cde3 \
-    --hash=sha256:3fb3807b83f3d263530f303d90bf19f4f3c7f966067b886906d24aaa13df984d \
-    --hash=sha256:be63c342ef39fa298625770f2cc9b82a34f587ebe2fe36f46c5b4f5691e312c4 \
-    --hash=sha256:e7cb6ed70bd1d25e2be9245375d9b8a43bec7e10b84e4d65beec218186a2fcbb
+psycopg-c==3.3.8; implementation_name != 'pypy' \
+    --hash=sha256:af81a99b02600e6c2cdf468509c04bb8208500ea60d63f70616e32ea9cb2758f
     # via psycopg
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 pydantic==2.13.4 \
