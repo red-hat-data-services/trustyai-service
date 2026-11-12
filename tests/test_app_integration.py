@@ -347,7 +347,6 @@ class TestPortCollisionGuard:
                 os.environ,
                 {"HTTP_PORT": "8081", "SSL_PORT": "4443", "HEALTH_PORT": "8080"},
             ),
-            patch("trustyai_service.main.PolicyAwareConfig"),
             patch("trustyai_service.main.serve", side_effect=RuntimeError("stop")),
             pytest.raises(RuntimeError, match="stop"),
         ):
