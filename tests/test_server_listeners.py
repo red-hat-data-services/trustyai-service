@@ -140,7 +140,8 @@ async def test_run_server_binds_the_configured_ports(
     with patch("trustyai_service.main.serve") as serve_mock:
         await run_server()
 
-    api_config = serve_mock.call_args_list[0].args[1]
-    health_config = serve_mock.call_args_list[1].args[1]
+    configs = {call.args[0]: call.args[1] for call in serve_mock.call_args_list}
+    api_config = configs[main.app]
+    health_config = configs[main.health_app]
     assert _bound_ports(api_config) == {"secure": [], "insecure": [http_port]}
     assert _bound_ports(health_config) == {"secure": [], "insecure": [health_port]}
