@@ -3,5 +3,25 @@
   "extends": [
     "github>red-hat-data-services/konflux-central//renovate/default-renovate.json5",
     "github>red-hat-data-services/konflux-central//renovate/aipcc-base-images-renovate.json5"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the AIPCC CPU base image in .konflux/base-images.conf (tag plus digest)",
+      "managerFilePatterns": ["/^\\.konflux/base-images\\.conf$/"],
+      "matchStrings": [
+        "CPU_BASE_IMAGE=(?<depName>quay\\.io/aipcc/base-images/[^:\\s@]+):(?<currentValue>[^@\\s]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "regex:^(?:(?<compatibility>.+)-)?(?<major>\\d{8,})$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Keep the CPU base image digest-pinned",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["quay.io/aipcc/base-images/cpu-torch*"],
+      "pinDigests": true
+    }
   ]
 }
