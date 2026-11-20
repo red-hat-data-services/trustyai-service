@@ -1,0 +1,26 @@
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ContractSet
+metadata:
+  name: trustyai-service
+spec:
+  contracts:
+    - id: trustyai-service-v1
+      type: openapi
+      # app.openapi() of the FastAPI application, generated and committed by
+      # scripts/generate_openapi.py; that script's own --check mode keeps it fresh in CI.
+      declaredArtifact: docs/openapi.yaml
+      # Bounded to the consumer-facing service API: fairness, drift, identity,
+      # metadata (/info), /data/upload and the legacy top-level aliases. These are
+      # what the ODH Dashboard (packages/trustyai/src/api/custom.ts) and the AI
+      # Safety test suite call. Deliberately outside the contract: the bare " / "
+      # root and cloud-event endpoints, the internal-only inference consumer
+      # (/consumer/kserve/v2) and the operational /q probes. Go RE2 has no
+      # lookahead, so the scope is spelled out as the included prefixes.
+      matchPath: "^/(data|dir|info|metrics|spd)(/|$)"
+      generator:
+        adapter: openapi.static
+        source: docs/openapi.yaml
+      policy:
+        oasdiffVersion: "1.33.0"
+        yqVersion: "4.45.1"
+        flattenAllOf: true
