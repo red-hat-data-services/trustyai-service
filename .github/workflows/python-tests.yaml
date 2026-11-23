@@ -102,7 +102,7 @@ jobs:
     # real PostgreSQL and MariaDB servers. SQLite runs in-process.
     services:
       postgres:
-        image: postgres:16
+        image: postgres:19
         env:
           POSTGRES_USER: trustyai
           POSTGRES_PASSWORD: trustyai  # pragma: allowlist secret
