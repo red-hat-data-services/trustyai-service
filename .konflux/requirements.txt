@@ -102,8 +102,9 @@ mariadb==1.1.14 \
     --hash=sha256:cc44a11b3c3d90fe2700f2c014ce786a1c4cc9f3daa6bb58eb5f0b4d1b01bbfd
     # via trustyai-service (pyproject.toml)
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
-narwhals==2.24.0 \
-    --hash=sha256:ae5dba38aebfe266560b6280bc481060be3abfb8a9df9e0050b03cb7fae6019d
+narwhals==2.29.0 \
+    --hash=sha256:1c69b3dc30240f6e848c5a673cafc86affa44184ecce721e25b7194663ad10dc \
+    --hash=sha256:eb19c877d9a705300bcc9414499a07b32a52db703369414e57e474ca5fc63c42
     # via scikit-learn
     # from https://packages.redhat.com/api/pypi/public-rhai/cpu-torch2.13-el9.8-test/simple/
 numpy==2.5.2 \
